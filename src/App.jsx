@@ -116,6 +116,142 @@ function ProductGallery({ product, selectedImage, onSelectImage }) {
   )
 }
 
+function truncateLabel(value, max = 22) {
+  const text = String(value || '')
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
+function ActivityChart({ series }) {
+  const width = 640
+  const height = 220
+  const pad = { top: 18, right: 16, bottom: 28, left: 36 }
+  const points = series?.length ? series : []
+  const maxY = Math.max(1, ...points.flatMap((day) => [day.pageViews, day.productViews, day.addToCart]))
+  const innerW = width - pad.left - pad.right
+  const innerH = height - pad.top - pad.bottom
+  const x = (index) => pad.left + (points.length <= 1 ? innerW / 2 : (index / (points.length - 1)) * innerW)
+  const y = (value) => pad.top + innerH - (value / maxY) * innerH
+  const pathFor = (key) => points.map((day, index) => `${index === 0 ? 'M' : 'L'}${x(index)},${y(day[key])}`).join(' ')
+  const areaFor = (key) => {
+    if (!points.length) return ''
+    return `${pathFor(key)} L${x(points.length - 1)},${pad.top + innerH} L${x(0)},${pad.top + innerH} Z`
+  }
+  const ticks = [0, 0.5, 1].map((ratio) => Math.round(maxY * ratio))
+
+  return (
+    <div className="chart-wrap">
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Actividad diaria de los últimos 30 días">
+        {ticks.map((tick) => (
+          <g key={`tick-${tick}`}>
+            <line x1={pad.left} x2={width - pad.right} y1={y(tick)} y2={y(tick)} className="chart-grid" />
+            <text x={pad.left - 8} y={y(tick) + 4} className="chart-axis" textAnchor="end">{tick}</text>
+          </g>
+        ))}
+        <path d={areaFor('pageViews')} className="chart-area-views" />
+        <path d={pathFor('pageViews')} className="chart-line-views" fill="none" />
+        <path d={pathFor('productViews')} className="chart-line-products" fill="none" />
+        <path d={pathFor('addToCart')} className="chart-line-cart" fill="none" />
+        {points.length > 0 && (
+          <>
+            <text x={pad.left} y={height - 8} className="chart-axis">{points[0].date.slice(5)}</text>
+            <text x={width - pad.right} y={height - 8} className="chart-axis" textAnchor="end">{points[points.length - 1].date.slice(5)}</text>
+          </>
+        )}
+      </svg>
+      <div className="chart-legend">
+        <span><i className="swatch views" />Visitas</span>
+        <span><i className="swatch products" />Clicks producto</span>
+        <span><i className="swatch cart" />Carrito</span>
+      </div>
+    </div>
+  )
+}
+
+function BarChart({ items, labelKey = 'productName', valueKey = 'count', empty = 'Sin datos todavía.' }) {
+  const rows = (items || []).slice(0, 8)
+  const max = Math.max(1, ...rows.map((item) => Number(item[valueKey]) || 0))
+  if (!rows.length) return <p className="admin-empty">{empty}</p>
+  return (
+    <ul className="bar-chart" aria-label="Ranking de productos">
+      {rows.map((item) => {
+        const value = Number(item[valueKey]) || 0
+        return (
+          <li key={`${item.productId || item[labelKey]}-${value}`}>
+            <div className="bar-meta">
+              <span>{truncateLabel(item[labelKey])}</span>
+              <strong>{value}</strong>
+            </div>
+            <div className="bar-track" aria-hidden="true"><span style={{ width: `${(value / max) * 100}%` }} /></div>
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
+function FunnelChart({ summary }) {
+  const steps = [
+    { label: 'Visitas', value: summary.pageViews, tone: 'views' },
+    { label: 'Clicks', value: summary.productViews, tone: 'products' },
+    { label: 'Carrito', value: summary.addToCart, tone: 'cart' },
+    { label: 'Ventas', value: summary.salesCount, tone: 'sales' },
+  ]
+  const max = Math.max(1, ...steps.map((step) => step.value))
+  return (
+    <ul className="funnel-chart" aria-label="Embudo de conversión">
+      {steps.map((step) => (
+        <li key={step.label}>
+          <div className="funnel-meta"><span>{step.label}</span><strong>{step.value}</strong></div>
+          <div className={`funnel-bar ${step.tone}`} style={{ width: `${Math.max(12, (step.value / max) * 100)}%` }} />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+function StockDonut({ total, unavailable }) {
+  const available = Math.max(0, total - unavailable)
+  const size = 160
+  const stroke = 18
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const availableLength = total > 0 ? (available / total) * circumference : 0
+  const unavailableLength = total > 0 ? (unavailable / total) * circumference : 0
+  return (
+    <div className="donut-chart">
+      <svg viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Disponibilidad de stock">
+        <circle cx={size / 2} cy={size / 2} r={radius} className="donut-track" strokeWidth={stroke} />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          className="donut-available"
+          strokeWidth={stroke}
+          strokeDasharray={`${availableLength} ${circumference}`}
+          strokeDashoffset={0}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          className="donut-unavailable"
+          strokeWidth={stroke}
+          strokeDasharray={`${unavailableLength} ${circumference}`}
+          strokeDashoffset={-availableLength}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+        <text x="50%" y="48%" textAnchor="middle" className="donut-value">{total}</text>
+        <text x="50%" y="62%" textAnchor="middle" className="donut-label">productos</text>
+      </svg>
+      <div className="chart-legend">
+        <span><i className="swatch available" />Disponibles {available}</span>
+        <span><i className="swatch unavailable" />Sin stock {unavailable}</span>
+      </div>
+    </div>
+  )
+}
+
 function getSessionId() {
   try {
     const existing = localStorage.getItem(SESSION_STORAGE_KEY)
@@ -321,6 +457,44 @@ function AdminPanel({ token, onLogout }) {
         <article><span>Carrito</span><strong>{data.summary.addToCart}</strong></article>
         <article className="stat-accent"><span>Ventas</span><strong>{data.summary.salesCount}</strong></article>
         <article className="stat-danger"><span>Sin stock</span><strong>{data.summary.productsUnavailable}</strong></article>
+      </div>
+
+      <div className="admin-charts">
+        <section className="admin-card admin-chart-wide">
+          <div className="admin-card-head">
+            <h2>Actividad · 30 días</h2>
+            <p>Visitas, clicks a productos y agregados al carrito por día.</p>
+          </div>
+          <ActivityChart series={data.dailySeries || []} />
+        </section>
+        <section className="admin-card">
+          <div className="admin-card-head">
+            <h2>Embudo</h2>
+            <p>De visita a venta registrada.</p>
+          </div>
+          <FunnelChart summary={data.summary} />
+        </section>
+        <section className="admin-card">
+          <div className="admin-card-head">
+            <h2>Stock</h2>
+            <p>Disponibles vs sin stock VOLKOVA.</p>
+          </div>
+          <StockDonut total={data.summary.productsTotal} unavailable={data.summary.productsUnavailable} />
+        </section>
+        <section className="admin-card">
+          <div className="admin-card-head">
+            <h2>Más vistos</h2>
+            <p>Top productos por clicks.</p>
+          </div>
+          <BarChart items={data.topViewedProducts} />
+        </section>
+        <section className="admin-card">
+          <div className="admin-card-head">
+            <h2>Más al carrito</h2>
+            <p>Top productos agregados.</p>
+          </div>
+          <BarChart items={data.topCartProducts} />
+        </section>
       </div>
 
       <div className="admin-layout">
@@ -693,8 +867,14 @@ function App() {
     </section>
 
     <section className="toolbar" aria-label="Filtros del catálogo">
-      <label className="search-field"><span className="sr-only">Buscar productos</span><input type="search" placeholder="Buscar productos" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} /></label>
-      <label><span className="sr-only">Ordenar productos</span><select value={filters.sort} onChange={(event) => changeSort(event.target.value)}><option value="recent">Recientes</option><option value="name">Alfabético</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option></select></label>
+      <label className="search-field">
+        <span className="sr-only">Buscar productos</span>
+        <span className="search-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10.5 3a7.5 7.5 0 0 1 5.95 12.1l3.72 3.73-1.34 1.34-3.73-3.72A7.5 7.5 0 1 1 10.5 3Zm0 2a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11Z" /></svg>
+        </span>
+        <input type="search" placeholder="Buscar productos, marca o referencia…" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} />
+      </label>
+      <label className="sort-field"><span className="sr-only">Ordenar productos</span><select value={filters.sort} onChange={(event) => changeSort(event.target.value)}><option value="recent">Recientes</option><option value="name">Alfabético</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option></select></label>
     </section>
 
     <nav className="mobile-categories" aria-label="Categorías">
