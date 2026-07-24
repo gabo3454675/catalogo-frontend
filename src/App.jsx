@@ -136,6 +136,7 @@ function AdminPanel({ token, onLogout }) {
     <section className="admin-panel">
       <div className="admin-header">
         <div>
+          <img className="admin-logo-inline" src="/kronos-logo.jpg" alt="KRONOS" width="180" height="98" />
           <p className="eyebrow">CONTROL KRONOS</p>
           <h1>Panel admin</h1>
           <p>Acceso: {data.adminEmail} · últimos {data.periodDays} días</p>
@@ -413,14 +414,17 @@ function App() {
     return (
       <main className="admin-shell">
         <header>
-          <a className="brand" href="/#" onClick={() => setView('store')}>KRONOS</a>
+          <a className="brand" href="/#" onClick={() => setView('store')} aria-label="KRONOS, volver al catálogo">
+            <img src="/kronos-logo.jpg" alt="KRONOS" width="160" height="87" />
+          </a>
           <div className="header-actions"><a href="/#">Volver al catálogo</a></div>
         </header>
         {!adminToken ? (
           <section className="admin-login">
+            <img className="admin-logo" src="/kronos-logo.jpg" alt="KRONOS" width="280" height="153" />
             <p className="eyebrow">ACCESO PRIVADO</p>
-            <h1>Admin</h1>
-            <p>Solo para el dueño de KRONOS. Ingresa tu token de administración.</p>
+            <h1>Panel del dueño</h1>
+            <p>Solo para ti. Los clientes del catálogo no ven ni necesitan este acceso.</p>
             <form onSubmit={saveAdminToken}>
               <label>
                 <span className="sr-only">Token admin</span>
@@ -438,16 +442,24 @@ function App() {
 
   return <main>
     <header>
-      <a className="brand" href="/" aria-label="KRONOS, inicio">KRONOS</a>
+      <a className="brand" href="/" aria-label="KRONOS, inicio">
+        <img src="/kronos-logo.jpg" alt="KRONOS" width="148" height="81" />
+      </a>
       <div className="header-actions">
-        <a className="admin-link" href="#admin">Admin</a>
         <button className="contact-trigger" onClick={() => setShowAdvisors(true)}>Asesores</button>
         <button className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Abrir carrito, ${itemCount} productos`}>Carrito ({itemCount})</button>
       </div>
     </header>
 
     <section className="hero">
-      <div className="hero-copy"><p className="eyebrow">TIEMPO · ESTILO · PRECISIÓN</p><h1>El tiempo, a tu manera.</h1><p>Relojes, bolsos, bandoleros y regalos seleccionados para ti.</p><a className="hero-cta" href="#catalogo">Explorar colección <span>↓</span></a></div>
+      <div className="hero-brand">
+        <img className="hero-logo" src="/kronos-logo.jpg" alt="KRONOS · Precisión y estilo · Relojería exclusiva" width="520" height="283" fetchPriority="high" />
+      </div>
+      <div className="hero-copy">
+        <h1>El tiempo, a tu manera.</h1>
+        <p>Relojes, bolsos, bandoleros y regalos seleccionados para ti.</p>
+        <a className="hero-cta" href="#catalogo">Explorar colección <span>↓</span></a>
+      </div>
     </section>
 
     <section className="toolbar" aria-label="Filtros del catálogo">
@@ -565,7 +577,7 @@ function App() {
       {showAdvisors && <section className="advisor-panel" aria-label="Asesores de venta"><button className="advisor-close" onClick={() => setShowAdvisors(false)} aria-label="Cerrar">×</button><strong>Asesores de venta</strong><p>Elige un asesor para conversar</p>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, generalMessage(advisor))} target="_blank" rel="noreferrer" onClick={() => setShowAdvisors(false)}><span>{advisor.label}</span><small>{advisor.number}</small></a>)}</section>}
       <button className="whatsapp-float" onClick={() => setShowAdvisors((current) => !current)} aria-expanded={showAdvisors} aria-label="Elegir asesor de ventas por WhatsApp"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z" /></svg><span>¿Te ayudamos?</span></button>
     </div>
-    <footer>© {new Date().getFullYear()} KRONOS · Asesor 1: {advisors[0].number} · Asesor 2: {advisors[1].number}</footer>
+    <footer>© {new Date().getFullYear()} KRONOS · Asesor 1: {advisors[0].number} · Asesor 2: {advisors[1].number} · <a className="admin-link" href="#admin">Dueño</a></footer>
   </main>
 }
 
