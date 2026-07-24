@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: kronos-frontend
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: npm ci && npm run build
+    startCommand: npm start -- --port $PORT
+    envVars:
+      - key: VITE_API_URL
+        sync: false
