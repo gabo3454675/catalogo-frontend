@@ -9,8 +9,8 @@ const advisors = [
   { label: 'Asesor 2', number: '04264125187' },
 ]
 
-const money = (value) => `$${Number(value).toFixed(2)}`
-const moneyBs = (value) => `Bs. ${Number(value).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const money = (value) => `$${Math.round(Number(value))}`
+const moneyBs = (value) => `Bs. ${Math.round(Number(value)).toLocaleString('es-VE')}`
 const whatsappUrl = (advisor, message) => `https://wa.me/58${advisor.number.slice(1)}?text=${encodeURIComponent(message)}`
 
 function getSessionId() {
