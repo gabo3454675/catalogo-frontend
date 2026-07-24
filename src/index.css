@@ -41,10 +41,20 @@ aside span { color: #938a80; font-size: .78rem; }
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 26px 18px; }
 .product { min-width: 0; padding: 8px; border-radius: 4px; transition: transform .25s ease, background .25s ease, box-shadow .25s ease; }
 .product:hover { transform: translateY(-6px); background: #fff; box-shadow: 0 14px 32px rgba(48,38,27,.10); }
-.image-button { display: block; border: 0; padding: 0; width: 100%; min-height: 44px; aspect-ratio: .82; background: #e9e4dd; overflow: hidden; }
+.image-button { display: block; border: 0; padding: 0; width: 100%; min-height: 44px; aspect-ratio: .82; background: #e9e4dd; overflow: hidden; position: relative; }
 .image-button img, .modal img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
 .image-button:hover img { transform: scale(1.04); }
 .image-placeholder { height: 100%; display: grid; place-items: center; color: #8d8172; letter-spacing: .15em; font-size: .7rem; }
+.image-placeholder.large { min-height: 280px; background: #ebe5dd; }
+.variant-badge { position: absolute; left: 8px; bottom: 8px; padding: 5px 8px; background: rgba(26,24,22,.82); color: #f4ebe3; font-size: .65rem; font-weight: 700; letter-spacing: .04em; }
+.variant-note { margin: 0 0 10px; color: #7a7169; font-size: .82rem; }
+.modal-media { margin: -26px -26px 18px; }
+.media-stage { position: relative; background: #1a1816; }
+.modal-main-image { aspect-ratio: 1; width: 100% !important; height: auto !important; margin: 0; object-fit: contain; background: #1a1816; }
+.media-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(255,255,255,.88); color: #1a1816; font-size: 1.5rem; line-height: 1; z-index: 2; }
+.media-nav.prev { left: 10px; }
+.media-nav.next { right: 10px; }
+.media-count { position: absolute; right: 12px; bottom: 12px; padding: 4px 8px; border-radius: 999px; background: rgba(0,0,0,.55); color: #fff; font-size: .7rem; }
 .product-category { margin: 14px 0 5px; color: #8d8172; text-transform: uppercase; font-size: .67rem; letter-spacing: .12em; }
 .product h3 { margin: 0 0 8px; font-size: .96rem; min-height: 2.4em; }
 .product strong, .modal strong { font-weight: 700; }
@@ -89,23 +99,13 @@ aside span { color: #938a80; font-size: .78rem; }
 .empty { grid-column: 1 / -1; color: #726a62; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 20; padding: 24px; display: grid; place-items: center; background: rgba(21, 18, 15, .7); }
 .modal { position: relative; width: min(100%, 540px); max-height: 90vh; overflow: auto; padding: 26px; background: #fff; }
-.modal-main-image { aspect-ratio: 1; margin: -26px -26px 20px; width: calc(100% + 52px) !important; height: auto !important; }
-.image-gallery { display: flex; gap: 8px; margin: 0 0 20px; overflow-x: auto; }
+.image-gallery { display: flex; gap: 8px; margin: 0; padding: 10px 12px 0; overflow-x: auto; background: #fff; }
 .image-gallery button { width: 64px; height: 64px; flex: 0 0 auto; padding: 0; border: 2px solid transparent; background: #eee8df; overflow: hidden; }
-.image-gallery button.active { border-color: #bda16a; }
+.image-gallery button.active { border-color: #c9a089; }
 .image-gallery img { width: 100%; height: 100%; margin: 0; object-fit: cover; }
 .modal h2 { font: 600 2rem 'Playfair Display', serif; margin: 0 0 10px; }
-.modal > p:not(.product-category) { color: #665e56; line-height: 1.6; }
+.modal > p:not(.product-category):not(.variant-note) { color: #665e56; line-height: 1.6; }
 .close { position: absolute; top: 10px; right: 12px; z-index: 2; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #fff; font-size: 24px; }
-.watch-viewer { height: 330px; margin: -26px -26px 20px; overflow: hidden; display: grid; place-items: center; perspective: 900px; background: radial-gradient(circle at 50% 45%, #807467, #211d1b 67%); touch-action: none; }
-.watch-viewer > p { position: absolute; align-self: end; color: #eee7dd !important; font-size: .72rem; letter-spacing: .06em; }
-.watch-3d { width: 175px; height: 250px; transform-style: preserve-3d; transition: transform .18s ease-out; }
-.watch-strap { width: 76px; height: 70px; margin: auto; background: linear-gradient(90deg, #111, #5d5750 50%, #111); transform: translateZ(-8px); }
-.watch-strap.top { border-radius: 38px 38px 8px 8px; }
-.watch-strap.bottom { border-radius: 8px 8px 38px 38px; }
-.watch-case { width: 175px; height: 175px; display: grid; place-items: center; overflow: hidden; border: 12px solid #bda16a; border-radius: 50%; background: #e9e1d2; box-shadow: inset 0 0 0 5px #262321, 0 18px 28px rgba(0,0,0,.45); transform: translateZ(12px); }
-.watch-case img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-.watch-case span { font: 700 1.6rem 'Playfair Display', serif; color: #262321; }
 .whatsapp-widget { position: fixed; right: max(18px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); z-index: 15; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .whatsapp-float { min-height: 56px; padding: 10px 16px 10px 11px; display: flex; align-items: center; gap: 9px; border: 0; border-radius: 999px; background: #25d366; color: #fff; font-weight: 700; font-size: .85rem; box-shadow: 0 10px 28px rgba(13, 94, 46, .34); transition: transform .2s ease, box-shadow .2s ease; }
 .whatsapp-float:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(13, 94, 46, .42); }
@@ -212,9 +212,8 @@ footer { padding: 28px 5vw 92px; background: #201d1b; color: #bdb4a9; text-align
   .add-button { min-height: 44px; }
   .modal-backdrop { align-items: end; padding: 0; }
   .modal { width: 100%; max-height: 92dvh; padding: 20px; border-radius: 18px 18px 0 0; padding-bottom: max(24px, env(safe-area-inset-bottom)); }
-  .modal-main-image { margin: -20px -20px 18px; width: calc(100% + 40px) !important; }
+  .modal-media { margin: -20px -20px 16px; }
   .modal h2 { font-size: 1.65rem; }
-  .watch-viewer { height: 300px; margin: -20px -20px 18px; }
   .close { position: sticky; float: right; top: 8px; margin-bottom: -34px; }
   .whatsapp-widget { right: 14px; bottom: max(14px, env(safe-area-inset-bottom)); }
   .whatsapp-float { min-height: 54px; padding-right: 14px; }

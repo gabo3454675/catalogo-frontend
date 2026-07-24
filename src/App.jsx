@@ -12,6 +12,109 @@ const advisors = [
 const money = (value) => `$${Math.round(Number(value))}`
 const moneyBs = (value) => `Bs. ${Math.round(Number(value)).toLocaleString('es-VE')}`
 const whatsappUrl = (advisor, message) => `https://wa.me/58${advisor.number.slice(1)}?text=${encodeURIComponent(message)}`
+const catalogOrigin = () => window.location.origin
+
+function buildProductWhatsApp(product, advisor) {
+  const lines = [
+    `Hola ${advisor.label},`,
+    '',
+    'Vengo del *catálogo KRONOS* y quiero consultar este producto:',
+    '',
+    `*${product.name}*`,
+    product.sku ? `Ref: ${product.sku}` : null,
+    product.brand?.name ? `Marca: ${product.brand.name}` : null,
+    product.category?.name ? `Categoría: ${product.category.name}` : null,
+    `Precio: ${money(product.price)}${product.priceBs != null ? ` · ${moneyBs(product.priceBs)}` : ''}`,
+    product.imageUrl ? `Foto: ${product.imageUrl}` : null,
+    '',
+    `Catálogo: ${catalogOrigin()}`,
+  ]
+  return lines.filter((line) => line !== null).join('\n')
+}
+
+function buildCartWhatsApp(cart, advisor, total, totalBs) {
+  const lines = [
+    `Hola ${advisor.label},`,
+    '',
+    'Vengo del *catálogo KRONOS* y quiero realizar este pedido:',
+    '',
+    ...cart.map((item, index) => {
+      const lineTotal = Number(item.price) * item.quantity
+      const lineBs = item.priceBs != null ? Number(item.priceBs) * item.quantity : null
+      return `${index + 1}. *${item.name}*${item.sku ? ` (Ref ${item.sku})` : ''}\n   Cant: ${item.quantity} · ${money(lineTotal)}${lineBs != null ? ` · ${moneyBs(lineBs)}` : ''}`
+    }),
+    '',
+    `*Total: ${money(total)}${totalBs ? ` · ${moneyBs(totalBs)}` : ''}*`,
+    '',
+    `Catálogo: ${catalogOrigin()}`,
+  ]
+  return lines.join('\n')
+}
+
+function buildGeneralWhatsApp(advisor) {
+  return [
+    `Hola ${advisor.label},`,
+    '',
+    'Vengo del *catálogo KRONOS* y quiero información sobre sus productos.',
+    '',
+    `Catálogo: ${catalogOrigin()}`,
+  ].join('\n')
+}
+
+function ProductGallery({ product, selectedImage, onSelectImage }) {
+  const images = product.images?.length
+    ? product.images
+    : product.imageUrl
+      ? [{ id: 'main', url: product.imageUrl }]
+      : []
+  const currentIndex = Math.max(0, images.findIndex((image) => image.url === selectedImage))
+  const safeIndex = currentIndex >= 0 ? currentIndex : 0
+  const imageKey = images.map((image) => image.url).join('|')
+
+  useEffect(() => {
+    if (images.length < 2) return undefined
+    const timer = window.setInterval(() => {
+      const next = images[(safeIndex + 1) % images.length]
+      onSelectImage(next.url)
+    }, 3500)
+    return () => window.clearInterval(timer)
+  }, [imageKey, onSelectImage, safeIndex, images])
+
+  if (!images.length) {
+    return <div className="modal-media"><div className="image-placeholder large">KRONOS</div></div>
+  }
+
+  const go = (delta) => {
+    const next = images[(safeIndex + delta + images.length) % images.length]
+    onSelectImage(next.url)
+  }
+
+  return (
+    <div className="modal-media">
+      <div className="media-stage">
+        {images.length > 1 && <button type="button" className="media-nav prev" onClick={() => go(-1)} aria-label="Imagen anterior">‹</button>}
+        <img className="modal-main-image" src={selectedImage || images[0].url} alt={product.name} />
+        {images.length > 1 && <button type="button" className="media-nav next" onClick={() => go(1)} aria-label="Imagen siguiente">›</button>}
+        {images.length > 1 && <span className="media-count">{safeIndex + 1} / {images.length}</span>}
+      </div>
+      {images.length > 1 && (
+        <div className="image-gallery">
+          {images.map((image, index) => (
+            <button
+              key={image.id}
+              type="button"
+              className={selectedImage === image.url ? 'active' : ''}
+              onClick={() => onSelectImage(image.url)}
+              aria-label={`Ver imagen ${index + 1}`}
+            >
+              <img src={image.url} alt="" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 function getSessionId() {
   try {
@@ -220,7 +323,6 @@ function App() {
   const [categoryError, setCategoryError] = useState(false)
   const [selected, setSelected] = useState(null)
   const [selectedImage, setSelectedImage] = useState(null)
-  const [watchRotation, setWatchRotation] = useState({ x: -10, y: 25 })
   const [cartOpen, setCartOpen] = useState(false)
   const [selectedAdvisor, setSelectedAdvisor] = useState(0)
   const [showAdvisors, setShowAdvisors] = useState(false)
@@ -357,7 +459,6 @@ function App() {
   const openProduct = (product) => {
     setSelected(product)
     setSelectedImage(product.imageUrl || product.images?.[0]?.url || null)
-    setWatchRotation({ x: -10, y: 25 })
     trackEvent('product_view', { productId: product.id, productName: product.name })
   }
   const addToCart = (product) => {
@@ -379,20 +480,9 @@ function App() {
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
   const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0)
   const totalBs = cart.reduce((sum, item) => sum + Number(item.priceBs || 0) * item.quantity, 0)
-  const cartMessage = `Hola ${advisors[selectedAdvisor].label}, quiero realizar este pedido:\n${cart.map((item) => `• ${item.name} x${item.quantity} — ${money(Number(item.price) * item.quantity)}${item.priceBs != null ? ` (${moneyBs(Number(item.priceBs) * item.quantity)})` : ''}`).join('\n')}\n\nTotal: ${money(total)}${totalBs ? ` / ${moneyBs(totalBs)}` : ''}`
-  const productMessage = (product, advisor) => [
-    `Hola ${advisor.label}, quiero consultar por este producto:`,
-    `${product.name} — ${money(product.price)}${product.priceBs != null ? ` (${moneyBs(product.priceBs)})` : ''}`,
-    product.imageUrl ? `Foto: ${product.imageUrl}` : '',
-  ].filter(Boolean).join('\n')
-  const generalMessage = (advisor) => `Hola ${advisor.label}, vi el catálogo de KRONOS y quiero información sobre sus productos.`
-  const rotateWatch = (event) => {
-    const bounds = event.currentTarget.getBoundingClientRect()
-    setWatchRotation({
-      x: ((event.clientY - bounds.top) / bounds.height - 0.5) * -40,
-      y: ((event.clientX - bounds.left) / bounds.width - 0.5) * 70,
-    })
-  }
+  const cartMessage = buildCartWhatsApp(cart, advisors[selectedAdvisor], total, totalBs)
+  const productMessage = (product, advisor) => buildProductWhatsApp(product, advisor)
+  const generalMessage = (advisor) => buildGeneralWhatsApp(advisor)
 
   const saveAdminToken = (event) => {
     event.preventDefault()
@@ -523,7 +613,10 @@ function App() {
         {!loading && error && <div className="status-message" role="alert"><p>{error}</p><button onClick={() => setReloadKey((current) => current + 1)}>Reintentar</button></div>}
         {!loading && !error && <div className="grid">
           {products.map((product) => <article className="product" key={product.id}>
-            <button className="image-button" onClick={() => openProduct(product)} aria-label={`Ver detalles de ${product.name}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}</button>
+            <button className="image-button" onClick={() => openProduct(product)} aria-label={`Ver detalles de ${product.name}`}>
+              {product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}
+              {product.variantCount > 1 && <span className="variant-badge">{product.variantCount} variantes</span>}
+            </button>
             <p className="product-category">{[product.brand?.name, product.productType || product.category?.name].filter(Boolean).join(' · ')}</p>
             <h3>{product.name}</h3>
             <PriceBlock price={product.price} priceBs={product.priceBs} />
@@ -539,11 +632,10 @@ function App() {
     {selected && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeProduct()}>
       <section className="modal product-modal" ref={productDialogRef} role="dialog" aria-modal="true" aria-labelledby="product-dialog-title">
         <button className="close" onClick={closeProduct} aria-label="Cerrar detalles">×</button>
-        {selected.category?.name?.toLowerCase() === 'relojes' && <div className="watch-viewer" onPointerMove={rotateWatch} onPointerLeave={() => setWatchRotation({ x: -10, y: 25 })}><div className="watch-3d" style={{ transform: `rotateX(${watchRotation.x}deg) rotateY(${watchRotation.y}deg)` }}><div className="watch-strap top" /><div className="watch-case">{selectedImage ? <img src={selectedImage} alt={`Vista de ${selected.name}`} /> : <span>12:00</span>}</div><div className="watch-strap bottom" /></div><p>Mueve el cursor para girar la vista 3D</p></div>}
-        {selectedImage && selected.category?.name?.toLowerCase() !== 'relojes' && <img className="modal-main-image" src={selectedImage} alt={selected.name} />}
-        {selected.images?.length > 1 && <div className="image-gallery">{selected.images.map((image) => <button key={image.id} className={selectedImage === image.url ? 'active' : ''} onClick={() => setSelectedImage(image.url)} aria-label={`Ver imagen ${image.sortOrder + 1}`}><img src={image.url} alt="" /></button>)}</div>}
+        <ProductGallery product={selected} selectedImage={selectedImage} onSelectImage={setSelectedImage} />
         <p className="product-category">{[selected.brand?.name, selected.productType || selected.category?.name].filter(Boolean).join(' · ')}</p>
         <h2 id="product-dialog-title">{selected.name}</h2>
+        {selected.variantCount > 1 && <p className="variant-note">Hay {selected.variantCount} variantes/colores disponibles. Desliza las fotos para verlas.</p>}
         <p>{selected.description || 'Producto disponible por encargo.'}</p>
         <PriceBlock price={selected.price} priceBs={selected.priceBs} />
         <button className="add-button" onClick={() => addToCart(selected)} disabled={!selected.available}>{selected.available ? 'AGREGAR AL CARRITO' : 'AGOTADO'}</button>
