@@ -198,6 +198,10 @@ function AdminPanel({ token, onLogout }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [reclassifying, setReclassifying] = useState(false)
+  const [saleSearch, setSaleSearch] = useState('')
+  const [saleResults, setSaleResults] = useState([])
+  const [saleNote, setSaleNote] = useState('')
+  const [savingSale, setSavingSale] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
@@ -213,6 +217,29 @@ function AdminPanel({ token, onLogout }) {
   }, [token])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    if (saleSearch.trim().length < 2) {
+      setSaleResults([])
+      return undefined
+    }
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      fetch(`${apiUrl}/admin/products?search=${encodeURIComponent(saleSearch.trim())}`, {
+        headers: { 'X-Kronos-Admin-Token': token },
+        signal: controller.signal,
+      })
+        .then((response) => response.ok ? response.json() : [])
+        .then(setSaleResults)
+        .catch((requestError) => {
+          if (requestError.name !== 'AbortError') setSaleResults([])
+        })
+    }, 280)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [saleSearch, token])
 
   const reclassify = async () => {
     setReclassifying(true)
@@ -231,8 +258,43 @@ function AdminPanel({ token, onLogout }) {
     }
   }
 
+  const markSold = async (product) => {
+    setSavingSale(true)
+    try {
+      const response = await fetch(`${apiUrl}/admin/sales`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Kronos-Admin-Token': token,
+        },
+        body: JSON.stringify({
+          productId: product.id,
+          quantity: 1,
+          note: saleNote.trim() || undefined,
+        }),
+      })
+      if (!response.ok) throw new Error('No se pudo registrar la venta')
+      setSaleNote('')
+      setSaleSearch('')
+      setSaleResults([])
+      load()
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSavingSale(false)
+    }
+  }
+
+  const removeSale = async (saleId) => {
+    const response = await fetch(`${apiUrl}/admin/sales/${saleId}`, {
+      method: 'DELETE',
+      headers: { 'X-Kronos-Admin-Token': token },
+    })
+    if (response.ok) load()
+  }
+
   if (loading) return <section className="admin-panel"><p>Cargando panel…</p></section>
-  if (error) return <section className="admin-panel"><p className="status-message" role="alert">{error}</p><button onClick={onLogout}>Salir</button></section>
+  if (error && !data) return <section className="admin-panel"><p className="status-message" role="alert">{error}</p><button onClick={onLogout}>Salir</button></section>
   if (!data) return null
 
   return (
@@ -251,13 +313,70 @@ function AdminPanel({ token, onLogout }) {
         </div>
       </div>
 
+      {error && <p className="admin-error" role="alert">{error}</p>}
+
       <div className="admin-stats">
         <article><span>Visitas</span><strong>{data.summary.pageViews}</strong></article>
         <article><span>Sesiones</span><strong>{data.summary.uniqueSessions}</strong></article>
-        <article><span>Clicks producto</span><strong>{data.summary.productViews}</strong></article>
-        <article><span>Al carrito</span><strong>{data.summary.addToCart}</strong></article>
-        <article><span>Catálogo</span><strong>{data.summary.productsTotal}</strong></article>
+        <article><span>Clicks</span><strong>{data.summary.productViews}</strong></article>
+        <article><span>Carrito</span><strong>{data.summary.addToCart}</strong></article>
+        <article><span>Ventas</span><strong>{data.summary.salesCount}</strong></article>
+        <article><span>Sin stock</span><strong>{data.summary.productsUnavailable}</strong></article>
       </div>
+
+      <section className="admin-sales">
+        <h2>Registrar venta</h2>
+        <p className="admin-hint">Esto es solo tu control interno. No marca el producto en rojo ni lo quita del stock: eso solo lo hace la importación de VOLKOVAMEN.</p>
+        <label>
+          <span className="sr-only">Buscar producto vendido</span>
+          <input
+            type="search"
+            value={saleSearch}
+            onChange={(event) => setSaleSearch(event.target.value)}
+            placeholder="Buscar por nombre o ref…"
+          />
+        </label>
+        <label>
+          <span className="sr-only">Nota de venta</span>
+          <input
+            type="text"
+            value={saleNote}
+            onChange={(event) => setSaleNote(event.target.value)}
+            placeholder="Nota opcional (cliente, color, etc.)"
+          />
+        </label>
+        {!!saleResults.length && (
+          <ul className="admin-sale-results">
+            {saleResults.map((product) => (
+              <li key={product.id}>
+                <div>
+                  <strong>{product.name}</strong>
+                  <small>{product.sku ? `Ref ${product.sku}` : 'Sin ref'} · {money(product.price)}{product.available ? '' : ' · sin stock VOLKOVA'}</small>
+                </div>
+                <button type="button" onClick={() => markSold(product)} disabled={savingSale}>Marcar vendido</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <h3>Ventas registradas</h3>
+        <ul className="admin-sale-list">
+          {(data.sales || []).map((sale) => (
+            <li key={sale.id}>
+              <div>
+                <strong>{sale.productName}</strong>
+                <small>
+                  {new Date(sale.soldAt).toLocaleString('es-VE')}
+                  {sale.sku ? ` · Ref ${sale.sku}` : ''}
+                  {sale.priceUsd != null ? ` · ${money(sale.priceUsd)}` : ''}
+                  {sale.note ? ` · ${sale.note}` : ''}
+                </small>
+              </div>
+              <button type="button" className="remove-item" onClick={() => removeSale(sale.id)}>Quitar</button>
+            </li>
+          ))}
+          {!data.sales?.length && <li>Aún no registraste ventas.</li>}
+        </ul>
+      </section>
 
       <div className="admin-grid">
         <section>
@@ -275,14 +394,14 @@ function AdminPanel({ token, onLogout }) {
       </div>
 
       <section className="admin-syncs">
-        <h2>Importaciones</h2>
+        <h2>Importaciones VOLKOVAMEN</h2>
         {data.syncRuns.map((run) => (
           <article key={run.id} className="admin-sync">
             <div>
               <strong>{run.status}</strong>
               <span>{new Date(run.startedAt).toLocaleString('es-VE')}</span>
             </div>
-            <p>Encontrados: {run.productsFound} · Nuevos: {run.productsAdded}</p>
+            <p>Encontrados: {run.productsFound} · Nuevos: {run.productsAdded} · Sin stock: {run.productsUnavailable ?? 0}</p>
             {run.error && <p className="admin-error">{run.error}</p>}
             {!!run.additions?.length && (
               <ul>
@@ -612,15 +731,16 @@ function App() {
         {loading && <div className="grid skeleton-grid" aria-label="Cargando productos" aria-busy="true">{Array.from({ length: 8 }, (_, index) => <div className="skeleton-card" key={index}><span /><span /><span /></div>)}</div>}
         {!loading && error && <div className="status-message" role="alert"><p>{error}</p><button onClick={() => setReloadKey((current) => current + 1)}>Reintentar</button></div>}
         {!loading && !error && <div className="grid">
-          {products.map((product) => <article className="product" key={product.id}>
+          {products.map((product) => <article className={`product${product.available ? '' : ' unavailable'}`} key={product.id}>
             <button className="image-button" onClick={() => openProduct(product)} aria-label={`Ver detalles de ${product.name}`}>
               {product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}
               {product.variantCount > 1 && <span className="variant-badge">{product.variantCount} variantes</span>}
+              {!product.available && <span className="stock-badge">Sin stock</span>}
             </button>
             <p className="product-category">{[product.brand?.name, product.productType || product.category?.name].filter(Boolean).join(' · ')}</p>
             <h3>{product.name}</h3>
             <PriceBlock price={product.price} priceBs={product.priceBs} />
-            <button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'AGOTADO'}</button>
+            <button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'SIN STOCK'}</button>
             <details className="consult-menu"><summary>Consultar por WhatsApp</summary><div>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, productMessage(product, advisor))} target="_blank" rel="noreferrer">{advisor.label}</a>)}</div></details>
           </article>)}
           {!products.length && <p className="empty">No encontramos productos con esos filtros.</p>}
@@ -636,9 +756,10 @@ function App() {
         <p className="product-category">{[selected.brand?.name, selected.productType || selected.category?.name].filter(Boolean).join(' · ')}</p>
         <h2 id="product-dialog-title">{selected.name}</h2>
         {selected.variantCount > 1 && <p className="variant-note">Hay {selected.variantCount} variantes/colores disponibles. Desliza las fotos para verlas.</p>}
+        {!selected.available && <p className="stock-note">Sin stock en VOLKOVAMEN. Puedes consultar por WhatsApp por si vuelve.</p>}
         <p>{selected.description || 'Producto disponible por encargo.'}</p>
         <PriceBlock price={selected.price} priceBs={selected.priceBs} />
-        <button className="add-button" onClick={() => addToCart(selected)} disabled={!selected.available}>{selected.available ? 'AGREGAR AL CARRITO' : 'AGOTADO'}</button>
+        <button className="add-button" onClick={() => addToCart(selected)} disabled={!selected.available}>{selected.available ? 'AGREGAR AL CARRITO' : 'SIN STOCK'}</button>
         <div className="modal-consult"><p>Consultar por WhatsApp</p>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, productMessage(selected, advisor))} target="_blank" rel="noreferrer">{advisor.label}</a>)}</div>
       </section>
     </div>}

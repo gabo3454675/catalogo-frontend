@@ -47,7 +47,12 @@ aside span { color: #938a80; font-size: .78rem; }
 .image-placeholder { height: 100%; display: grid; place-items: center; color: #8d8172; letter-spacing: .15em; font-size: .7rem; }
 .image-placeholder.large { min-height: 280px; background: #ebe5dd; }
 .variant-badge { position: absolute; left: 8px; bottom: 8px; padding: 5px 8px; background: rgba(26,24,22,.82); color: #f4ebe3; font-size: .65rem; font-weight: 700; letter-spacing: .04em; }
+.stock-badge { position: absolute; right: 8px; top: 8px; padding: 5px 8px; background: #9a2f2f; color: #fff; font-size: .65rem; font-weight: 700; letter-spacing: .04em; }
+.product.unavailable { outline: 2px solid rgba(154, 47, 47, .35); background: #fff6f5; }
+.product.unavailable h3, .product.unavailable .price-block strong { color: #8f2f2f; }
+.product.unavailable .image-button img { filter: grayscale(.35) saturate(.7); opacity: .88; }
 .variant-note { margin: 0 0 10px; color: #7a7169; font-size: .82rem; }
+.stock-note { margin: 0 0 10px; color: #9a2f2f; font-size: .86rem; font-weight: 600; }
 .modal-media { margin: -26px -26px 18px; }
 .media-stage { position: relative; background: #1a1816; }
 .modal-main-image { aspect-ratio: 1; width: 100% !important; height: auto !important; margin: 0; object-fit: contain; background: #1a1816; }
@@ -81,10 +86,19 @@ aside span { color: #938a80; font-size: .78rem; }
 .admin-header { display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; align-items: start; }
 .admin-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .admin-actions button:nth-child(2), .admin-actions button:nth-child(3) { background: #fff; color: #211d1a; }
-.admin-stats { margin: 28px 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+.admin-stats { margin: 28px 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; }
 .admin-stats article { padding: 16px; background: #f7f3ed; }
 .admin-stats span { display: block; color: #7a7169; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
 .admin-stats strong { display: block; margin-top: 8px; font: 600 1.8rem 'Playfair Display', serif; }
+.admin-sales { margin: 0 0 22px; padding: 18px; border: 1px solid #e6dfd5; }
+.admin-sales h2, .admin-sales h3 { margin: 0 0 10px; font: 600 1.2rem 'Playfair Display', serif; }
+.admin-sales h3 { margin-top: 18px; }
+.admin-hint { margin: 0 0 14px; color: #7a7169; font-size: .84rem; line-height: 1.45; }
+.admin-sales input { width: 100%; min-height: 46px; margin-bottom: 8px; padding: 11px 12px; border: 1px solid #d6cfc4; }
+.admin-sale-results, .admin-sale-list { margin: 0; padding: 0; list-style: none; }
+.admin-sale-results li, .admin-sale-list li { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee8e0; }
+.admin-sale-results small, .admin-sale-list small { display: block; margin-top: 3px; color: #7a7169; }
+.admin-sale-results button { min-height: 40px; padding: 8px 12px; border: 1px solid #211d1a; background: #211d1a; color: #fff; font-weight: 700; font-size: .75rem; }
 .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .admin-grid section, .admin-syncs { padding: 18px; border: 1px solid #e6dfd5; }
 .admin-grid h2, .admin-syncs h2 { margin: 0 0 12px; font: 600 1.2rem 'Playfair Display', serif; }
