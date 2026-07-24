@@ -293,23 +293,22 @@ function AdminPanel({ token, onLogout }) {
     if (response.ok) load()
   }
 
-  if (loading) return <section className="admin-panel"><p>Cargando panel…</p></section>
+  if (loading) return <section className="admin-panel"><p className="admin-loading">Cargando panel…</p></section>
   if (error && !data) return <section className="admin-panel"><p className="status-message" role="alert">{error}</p><button onClick={onLogout}>Salir</button></section>
   if (!data) return null
 
   return (
     <section className="admin-panel">
-      <div className="admin-header">
+      <div className="admin-hero-bar">
         <div>
-          <img className="admin-logo-inline" src="/kronos-logo.jpg" alt="KRONOS" width="180" height="98" />
-          <p className="eyebrow">CONTROL KRONOS</p>
-          <h1>Panel admin</h1>
-          <p>Acceso: {data.adminEmail} · últimos {data.periodDays} días</p>
+          <p className="eyebrow">CONTROL PRIVADO</p>
+          <h1>Panel KRONOS</h1>
+          <p className="admin-meta">{data.adminEmail} · últimos {data.periodDays} días · {data.summary.productsTotal} productos</p>
         </div>
         <div className="admin-actions">
-          <button onClick={load}>Actualizar</button>
-          <button onClick={reclassify} disabled={reclassifying}>{reclassifying ? 'Reclasificando…' : 'Reclasificar marcas'}</button>
-          <button onClick={onLogout}>Salir</button>
+          <button type="button" onClick={load}>Actualizar</button>
+          <button type="button" onClick={reclassify} disabled={reclassifying}>{reclassifying ? 'Reclasificando…' : 'Reclasificar'}</button>
+          <button type="button" className="admin-logout" onClick={onLogout}>Salir</button>
         </div>
       </div>
 
@@ -320,85 +319,98 @@ function AdminPanel({ token, onLogout }) {
         <article><span>Sesiones</span><strong>{data.summary.uniqueSessions}</strong></article>
         <article><span>Clicks</span><strong>{data.summary.productViews}</strong></article>
         <article><span>Carrito</span><strong>{data.summary.addToCart}</strong></article>
-        <article><span>Ventas</span><strong>{data.summary.salesCount}</strong></article>
-        <article><span>Sin stock</span><strong>{data.summary.productsUnavailable}</strong></article>
+        <article className="stat-accent"><span>Ventas</span><strong>{data.summary.salesCount}</strong></article>
+        <article className="stat-danger"><span>Sin stock</span><strong>{data.summary.productsUnavailable}</strong></article>
       </div>
 
-      <section className="admin-sales">
-        <h2>Registrar venta</h2>
-        <p className="admin-hint">Esto es solo tu control interno. No marca el producto en rojo ni lo quita del stock: eso solo lo hace la importación de VOLKOVAMEN.</p>
-        <label>
-          <span className="sr-only">Buscar producto vendido</span>
-          <input
-            type="search"
-            value={saleSearch}
-            onChange={(event) => setSaleSearch(event.target.value)}
-            placeholder="Buscar por nombre o ref…"
-          />
-        </label>
-        <label>
-          <span className="sr-only">Nota de venta</span>
-          <input
-            type="text"
-            value={saleNote}
-            onChange={(event) => setSaleNote(event.target.value)}
-            placeholder="Nota opcional (cliente, color, etc.)"
-          />
-        </label>
-        {!!saleResults.length && (
-          <ul className="admin-sale-results">
-            {saleResults.map((product) => (
-              <li key={product.id}>
+      <div className="admin-layout">
+        <section className="admin-card admin-sales">
+          <div className="admin-card-head">
+            <h2>Registrar venta</h2>
+            <p>Solo control interno. No cambia el stock del catálogo.</p>
+          </div>
+          <div className="admin-sale-form">
+            <label>
+              <span>Producto</span>
+              <input
+                type="search"
+                value={saleSearch}
+                onChange={(event) => setSaleSearch(event.target.value)}
+                placeholder="Buscar por nombre o ref…"
+              />
+            </label>
+            <label>
+              <span>Nota</span>
+              <input
+                type="text"
+                value={saleNote}
+                onChange={(event) => setSaleNote(event.target.value)}
+                placeholder="Cliente, color, etc."
+              />
+            </label>
+          </div>
+          {!!saleResults.length && (
+            <ul className="admin-sale-results">
+              {saleResults.map((product) => (
+                <li key={product.id}>
+                  <div>
+                    <strong>{product.name}</strong>
+                    <small>{product.sku ? `Ref ${product.sku}` : 'Sin ref'} · {money(product.price)}{product.available ? '' : ' · sin stock VOLKOVA'}</small>
+                  </div>
+                  <button type="button" onClick={() => markSold(product)} disabled={savingSale}>Vendido</button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <h3>Historial de ventas</h3>
+          <ul className="admin-sale-list">
+            {(data.sales || []).map((sale) => (
+              <li key={sale.id}>
                 <div>
-                  <strong>{product.name}</strong>
-                  <small>{product.sku ? `Ref ${product.sku}` : 'Sin ref'} · {money(product.price)}{product.available ? '' : ' · sin stock VOLKOVA'}</small>
+                  <strong>{sale.productName}</strong>
+                  <small>
+                    {new Date(sale.soldAt).toLocaleString('es-VE')}
+                    {sale.sku ? ` · Ref ${sale.sku}` : ''}
+                    {sale.priceUsd != null ? ` · ${money(sale.priceUsd)}` : ''}
+                    {sale.note ? ` · ${sale.note}` : ''}
+                  </small>
                 </div>
-                <button type="button" onClick={() => markSold(product)} disabled={savingSale}>Marcar vendido</button>
+                <button type="button" className="remove-item" onClick={() => removeSale(sale.id)}>Quitar</button>
               </li>
             ))}
+            {!data.sales?.length && <li className="admin-empty">Aún no registraste ventas.</li>}
           </ul>
-        )}
-        <h3>Ventas registradas</h3>
-        <ul className="admin-sale-list">
-          {(data.sales || []).map((sale) => (
-            <li key={sale.id}>
-              <div>
-                <strong>{sale.productName}</strong>
-                <small>
-                  {new Date(sale.soldAt).toLocaleString('es-VE')}
-                  {sale.sku ? ` · Ref ${sale.sku}` : ''}
-                  {sale.priceUsd != null ? ` · ${money(sale.priceUsd)}` : ''}
-                  {sale.note ? ` · ${sale.note}` : ''}
-                </small>
-              </div>
-              <button type="button" className="remove-item" onClick={() => removeSale(sale.id)}>Quitar</button>
-            </li>
-          ))}
-          {!data.sales?.length && <li>Aún no registraste ventas.</li>}
-        </ul>
-      </section>
+        </section>
 
-      <div className="admin-grid">
-        <section>
-          <h2>Más agregados al carrito</h2>
-          <ul>{data.topCartProducts.map((item) => <li key={`cart-${item.productId}`}><span>{item.productName}</span><strong>{item.count}</strong></li>)}
-            {!data.topCartProducts.length && <li>Sin datos todavía.</li>}
-          </ul>
-        </section>
-        <section>
-          <h2>Más vistos</h2>
-          <ul>{data.topViewedProducts.map((item) => <li key={`view-${item.productId}`}><span>{item.productName}</span><strong>{item.count}</strong></li>)}
-            {!data.topViewedProducts.length && <li>Sin datos todavía.</li>}
-          </ul>
-        </section>
+        <div className="admin-side">
+          <section className="admin-card">
+            <div className="admin-card-head">
+              <h2>Más al carrito</h2>
+            </div>
+            <ul>{data.topCartProducts.map((item) => <li key={`cart-${item.productId}`}><span>{item.productName}</span><strong>{item.count}</strong></li>)}
+              {!data.topCartProducts.length && <li className="admin-empty">Sin datos todavía.</li>}
+            </ul>
+          </section>
+          <section className="admin-card">
+            <div className="admin-card-head">
+              <h2>Más vistos</h2>
+            </div>
+            <ul>{data.topViewedProducts.map((item) => <li key={`view-${item.productId}`}><span>{item.productName}</span><strong>{item.count}</strong></li>)}
+              {!data.topViewedProducts.length && <li className="admin-empty">Sin datos todavía.</li>}
+            </ul>
+          </section>
+        </div>
       </div>
 
-      <section className="admin-syncs">
-        <h2>Importaciones VOLKOVAMEN</h2>
+      <section className="admin-card admin-syncs">
+        <div className="admin-card-head">
+          <h2>Importaciones VOLKOVAMEN</h2>
+          <p>El stock en rojo del catálogo se actualiza aquí.</p>
+        </div>
         {data.syncRuns.map((run) => (
           <article key={run.id} className="admin-sync">
-            <div>
-              <strong>{run.status}</strong>
+            <div className="admin-sync-top">
+              <strong className={`sync-status sync-${run.status}`}>{run.status}</strong>
               <span>{new Date(run.startedAt).toLocaleString('es-VE')}</span>
             </div>
             <p>Encontrados: {run.productsFound} · Nuevos: {run.productsAdded} · Sin stock: {run.productsUnavailable ?? 0}</p>
@@ -410,7 +422,7 @@ function AdminPanel({ token, onLogout }) {
             )}
           </article>
         ))}
-        {!data.syncRuns.length && <p>Aún no hay sincronizaciones registradas.</p>}
+        {!data.syncRuns.length && <p className="admin-empty">Aún no hay sincronizaciones registradas.</p>}
       </section>
     </section>
   )
@@ -626,21 +638,26 @@ function App() {
           <a className="brand" href="/#" onClick={() => setView('store')} aria-label="KRONOS, volver al catálogo">
             <img src="/kronos-logo.jpg" alt="KRONOS" width="160" height="87" />
           </a>
-          <div className="header-actions"><a href="/#">Volver al catálogo</a></div>
+          <div className="header-actions">
+            <a href="/#">Catálogo</a>
+            <span className="admin-tab active" aria-current="page">Admin</span>
+          </div>
         </header>
         {!adminToken ? (
           <section className="admin-login">
-            <img className="admin-logo" src="/kronos-logo.jpg" alt="KRONOS" width="280" height="153" />
-            <p className="eyebrow">ACCESO PRIVADO</p>
-            <h1>Panel del dueño</h1>
-            <p>Solo para ti. Los clientes del catálogo no ven ni necesitan este acceso.</p>
-            <form onSubmit={saveAdminToken}>
-              <label>
-                <span className="sr-only">Token admin</span>
-                <input type="password" value={adminInput} onChange={(event) => setAdminInput(event.target.value)} placeholder="Token admin" autoComplete="current-password" />
-              </label>
-              <button type="submit">Entrar</button>
-            </form>
+            <div className="admin-login-visual" aria-hidden="true" />
+            <div className="admin-login-card">
+              <p className="eyebrow">ACCESO PRIVADO</p>
+              <h1>Admin KRONOS</h1>
+              <p>Solo para el dueño. Los clientes no necesitan login.</p>
+              <form onSubmit={saveAdminToken}>
+                <label>
+                  <span>Token de administración</span>
+                  <input type="password" value={adminInput} onChange={(event) => setAdminInput(event.target.value)} placeholder="Pega tu token" autoComplete="current-password" />
+                </label>
+                <button type="submit">Entrar al panel</button>
+              </form>
+            </div>
           </section>
         ) : (
           <AdminPanel token={adminToken} onLogout={logoutAdmin} />
@@ -655,19 +672,23 @@ function App() {
         <img src="/kronos-logo.jpg" alt="KRONOS" width="148" height="81" />
       </a>
       <div className="header-actions">
+        <a className="admin-tab" href="#admin">Admin</a>
         <button className="contact-trigger" onClick={() => setShowAdvisors(true)}>Asesores</button>
         <button className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Abrir carrito, ${itemCount} productos`}>Carrito ({itemCount})</button>
       </div>
     </header>
 
-    <section className="hero">
-      <div className="hero-brand">
-        <img className="hero-logo" src="/kronos-logo.jpg" alt="KRONOS · Precisión y estilo · Relojería exclusiva" width="520" height="283" fetchPriority="high" />
-      </div>
-      <div className="hero-copy">
-        <h1>El tiempo, a tu manera.</h1>
-        <p>Relojes, bolsos, bandoleros y regalos seleccionados para ti.</p>
-        <a className="hero-cta" href="#catalogo">Explorar colección <span>↓</span></a>
+    <section className="hero" aria-label="KRONOS">
+      <div className="hero-stage">
+        <img className="hero-bg" src="/kronos-logo.jpg" alt="" aria-hidden="true" fetchPriority="high" />
+        <div className="hero-veil" aria-hidden="true" />
+        <div className="hero-copy">
+          <p className="hero-brand-name">KRONOS</p>
+          <p className="hero-tag">Precisión y estilo · Relojería exclusiva</p>
+          <h1>El tiempo, a tu manera.</h1>
+          <p className="hero-lead">Relojes, bolsos, bandoleros y regalos seleccionados para ti.</p>
+          <a className="hero-cta" href="#catalogo">Explorar colección <span aria-hidden="true">↓</span></a>
+        </div>
       </div>
     </section>
 
@@ -788,7 +809,7 @@ function App() {
       {showAdvisors && <section className="advisor-panel" aria-label="Asesores de venta"><button className="advisor-close" onClick={() => setShowAdvisors(false)} aria-label="Cerrar">×</button><strong>Asesores de venta</strong><p>Elige un asesor para conversar</p>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, generalMessage(advisor))} target="_blank" rel="noreferrer" onClick={() => setShowAdvisors(false)}><span>{advisor.label}</span><small>{advisor.number}</small></a>)}</section>}
       <button className="whatsapp-float" onClick={() => setShowAdvisors((current) => !current)} aria-expanded={showAdvisors} aria-label="Elegir asesor de ventas por WhatsApp"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z" /></svg><span>¿Te ayudamos?</span></button>
     </div>
-    <footer>© {new Date().getFullYear()} KRONOS · Asesor 1: {advisors[0].number} · Asesor 2: {advisors[1].number} · <a className="admin-link" href="#admin">Dueño</a></footer>
+    <footer>© {new Date().getFullYear()} KRONOS · Asesor 1: {advisors[0].number} · Asesor 2: {advisors[1].number}</footer>
   </main>
 }
 
