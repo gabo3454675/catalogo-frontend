@@ -1,8 +1,12 @@
-const CACHE = 'kronos-shell-v1'
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/kronos-logo.jpg', '/kronos-icon-192.png', '/kronos-icon-512.png']
+const CACHE = 'kronos-shell-v2'
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)).then(() => self.skipWaiting()))
+  self.skipWaiting()
+  event.waitUntil(
+    caches.open(CACHE).then((cache) =>
+      cache.addAll(['/', '/index.html', '/manifest.webmanifest', '/kronos-logo.jpg', '/kronos-icon-192.png', '/kronos-icon-512.png']),
+    ),
+  )
 })
 
 self.addEventListener('activate', (event) => {
@@ -17,20 +21,32 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
 
-  if (request.mode === 'navigate') {
+  // Always prefer network for HTML and hashed assets so deploys show up on phones.
+  if (request.mode === 'navigate' || url.pathname.startsWith('/assets/')) {
     event.respondWith(
-      fetch(request).catch(() => caches.match('/index.html')),
+      fetch(request)
+        .then((response) => {
+          if (request.mode === 'navigate' && response.ok) {
+            const copy = response.clone()
+            caches.open(CACHE).then((cache) => cache.put('/index.html', copy))
+          }
+          return response
+        })
+        .catch(() => caches.match(request).then((cached) => cached || caches.match('/index.html'))),
     )
     return
   }
 
   event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-      const copy = response.clone()
-      if (response.ok && (url.pathname.startsWith('/assets/') || url.pathname.endsWith('.png') || url.pathname.endsWith('.jpg'))) {
-        caches.open(CACHE).then((cache) => cache.put(request, copy))
-      }
-      return response
-    }).catch(() => cached)),
+    caches.match(request).then((cached) =>
+      cached ||
+      fetch(request).then((response) => {
+        if (response.ok && (url.pathname.endsWith('.png') || url.pathname.endsWith('.jpg') || url.pathname.endsWith('.webmanifest'))) {
+          const copy = response.clone()
+          caches.open(CACHE).then((cache) => cache.put(request, copy))
+        }
+        return response
+      }).catch(() => cached),
+    ),
   )
 })
