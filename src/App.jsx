@@ -734,10 +734,9 @@ function App() {
           {products.map((product) => <article className={`product${product.available ? '' : ' unavailable'}`} key={product.id}>
             <button className="image-button" onClick={() => openProduct(product)} aria-label={`Ver detalles de ${product.name}`}>
               {product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}
-              {product.variantCount > 1 && <span className="variant-badge">{product.variantCount} variantes</span>}
               {!product.available && <span className="stock-badge">Sin stock</span>}
             </button>
-            <p className="product-category">{[product.brand?.name, product.productType || product.category?.name].filter(Boolean).join(' · ')}</p>
+            <p className="product-category">{[product.brand?.name, product.productType || product.category?.name].filter(Boolean).join(' · ')}{product.sku ? ` · Ref ${product.sku}` : ''}</p>
             <h3>{product.name}</h3>
             <PriceBlock price={product.price} priceBs={product.priceBs} />
             <button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'SIN STOCK'}</button>
@@ -753,9 +752,8 @@ function App() {
       <section className="modal product-modal" ref={productDialogRef} role="dialog" aria-modal="true" aria-labelledby="product-dialog-title">
         <button className="close" onClick={closeProduct} aria-label="Cerrar detalles">×</button>
         <ProductGallery product={selected} selectedImage={selectedImage} onSelectImage={setSelectedImage} />
-        <p className="product-category">{[selected.brand?.name, selected.productType || selected.category?.name].filter(Boolean).join(' · ')}</p>
+        <p className="product-category">{[selected.brand?.name, selected.productType || selected.category?.name].filter(Boolean).join(' · ')}{selected.sku ? ` · Ref ${selected.sku}` : ''}</p>
         <h2 id="product-dialog-title">{selected.name}</h2>
-        {selected.variantCount > 1 && <p className="variant-note">Hay {selected.variantCount} variantes/colores disponibles. Desliza las fotos para verlas.</p>}
         {!selected.available && <p className="stock-note">Sin stock en VOLKOVAMEN. Puedes consultar por WhatsApp por si vuelve.</p>}
         <p>{selected.description || 'Producto disponible por encargo.'}</p>
         <PriceBlock price={selected.price} priceBs={selected.priceBs} />
