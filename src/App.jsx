@@ -1,54 +1,390 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1'
+const PAGE_SIZE = 24
+const ADMIN_STORAGE_KEY = 'kronos-admin-token'
+const SESSION_STORAGE_KEY = 'kronos-session-id'
 const advisors = [
   { label: 'Asesor 1', number: '04241362318' },
   { label: 'Asesor 2', number: '04264125187' },
 ]
 
+const money = (value) => `$${Number(value).toFixed(2)}`
+const moneyBs = (value) => `Bs. ${Number(value).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const whatsappUrl = (advisor, message) => `https://wa.me/58${advisor.number.slice(1)}?text=${encodeURIComponent(message)}`
+
+function getSessionId() {
+  try {
+    const existing = localStorage.getItem(SESSION_STORAGE_KEY)
+    if (existing) return existing
+    const created = crypto.randomUUID()
+    localStorage.setItem(SESSION_STORAGE_KEY, created)
+    return created
+  } catch {
+    return `session-${Date.now()}`
+  }
+}
+
+function trackEvent(type, payload = {}) {
+  const body = {
+    type,
+    sessionId: getSessionId(),
+    path: window.location.pathname + window.location.hash,
+    ...payload,
+  }
+  fetch(`${apiUrl}/analytics`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    keepalive: true,
+  }).catch(() => {})
+}
+
+function useAccessibleDialog(open, onClose, dialogRef) {
+  const previousFocus = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    previousFocus.current = document.activeElement
+    const oldOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const dialog = dialogRef.current
+    const focusable = dialog?.querySelector('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')
+    focusable?.focus()
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+        return
+      }
+      if (event.key !== 'Tab' || !dialog) return
+      const elements = [...dialog.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+      if (!elements.length) return
+      const first = elements[0]
+      const last = elements[elements.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = oldOverflow
+      previousFocus.current?.focus?.()
+    }
+  }, [open, onClose, dialogRef])
+}
+
+function PriceBlock({ price, priceBs, className = '' }) {
+  return (
+    <div className={`price-block ${className}`.trim()}>
+      <strong>{money(price)}</strong>
+      {priceBs != null && <span className="price-bs">{moneyBs(priceBs)}</span>}
+    </div>
+  )
+}
+
+function AdminPanel({ token, onLogout }) {
+  const [data, setData] = useState(null)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [reclassifying, setReclassifying] = useState(false)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    setError('')
+    fetch(`${apiUrl}/admin/overview`, { headers: { 'X-Kronos-Admin-Token': token } })
+      .then((response) => {
+        if (!response.ok) throw new Error(response.status === 401 ? 'Token inválido' : 'No se pudo cargar el panel')
+        return response.json()
+      })
+      .then(setData)
+      .catch((requestError) => setError(requestError.message))
+      .finally(() => setLoading(false))
+  }, [token])
+
+  useEffect(() => { load() }, [load])
+
+  const reclassify = async () => {
+    setReclassifying(true)
+    try {
+      const response = await fetch(`${apiUrl}/admin/reclassify`, {
+        method: 'POST',
+        headers: { 'X-Kronos-Admin-Token': token },
+      })
+      if (!response.ok) throw new Error('No se pudo reclasificar')
+      await response.json()
+      load()
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setReclassifying(false)
+    }
+  }
+
+  if (loading) return <section className="admin-panel"><p>Cargando panel…</p></section>
+  if (error) return <section className="admin-panel"><p className="status-message" role="alert">{error}</p><button onClick={onLogout}>Salir</button></section>
+  if (!data) return null
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-header">
+        <div>
+          <p className="eyebrow">CONTROL KRONOS</p>
+          <h1>Panel admin</h1>
+          <p>Acceso: {data.adminEmail} · últimos {data.periodDays} días</p>
+        </div>
+        <div className="admin-actions">
+          <button onClick={load}>Actualizar</button>
+          <button onClick={reclassify} disabled={reclassifying}>{reclassifying ? 'Reclasificando…' : 'Reclasificar marcas'}</button>
+          <button onClick={onLogout}>Salir</button>
+        </div>
+      </div>
+
+      <div className="admin-stats">
+        <article><span>Visitas</span><strong>{data.summary.pageViews}</strong></article>
+        <article><span>Sesiones</span><strong>{data.summary.uniqueSessions}</strong></article>
+        <article><span>Clicks producto</span><strong>{data.summary.productViews}</strong></article>
+        <article><span>Al carrito</span><strong>{data.summary.addToCart}</strong></article>
+        <article><span>Catálogo</span><strong>{data.summary.productsTotal}</strong></article>
+      </div>
+
+      <div className="admin-grid">
+        <section>
+          <h2>Más agregados al carrito</h2>
+          <ul>{data.topCartProducts.map((item) => <li key={`cart-${item.productId}`}><span>{item.productName}</span><strong>{item.count}</strong></li>)}
+            {!data.topCartProducts.length && <li>Sin datos todavía.</li>}
+          </ul>
+        </section>
+        <section>
+          <h2>Más vistos</h2>
+          <ul>{data.topViewedProducts.map((item) => <li key={`view-${item.productId}`}><span>{item.productName}</span><strong>{item.count}</strong></li>)}
+            {!data.topViewedProducts.length && <li>Sin datos todavía.</li>}
+          </ul>
+        </section>
+      </div>
+
+      <section className="admin-syncs">
+        <h2>Importaciones</h2>
+        {data.syncRuns.map((run) => (
+          <article key={run.id} className="admin-sync">
+            <div>
+              <strong>{run.status}</strong>
+              <span>{new Date(run.startedAt).toLocaleString('es-VE')}</span>
+            </div>
+            <p>Encontrados: {run.productsFound} · Nuevos: {run.productsAdded}</p>
+            {run.error && <p className="admin-error">{run.error}</p>}
+            {!!run.additions?.length && (
+              <ul>
+                {run.additions.map((item) => <li key={item.id}>{item.productName}{item.sku ? ` · ${item.sku}` : ''}</li>)}
+              </ul>
+            )}
+          </article>
+        ))}
+        {!data.syncRuns.length && <p>Aún no hay sincronizaciones registradas.</p>}
+      </section>
+    </section>
+  )
+}
+
 function App() {
+  const [view, setView] = useState(() => (window.location.hash === '#admin' ? 'admin' : 'store'))
+  const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_STORAGE_KEY) || '')
+  const [adminInput, setAdminInput] = useState('')
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
-  const [cart, setCart] = useState([])
-  const [filters, setFilters] = useState({ search: '', category: '', sort: 'recent' })
+  const [watchBrands, setWatchBrands] = useState([])
+  const [watchTypes, setWatchTypes] = useState([])
+  const [cart, setCart] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('kronos-cart') ?? '[]')
+    } catch {
+      return []
+    }
+  })
+  const [filters, setFilters] = useState({ search: '', category: '', brand: '', type: '', sort: 'recent' })
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [pages, setPages] = useState(1)
+  const [totalProducts, setTotalProducts] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState('')
+  const [categoryError, setCategoryError] = useState(false)
   const [selected, setSelected] = useState(null)
   const [selectedImage, setSelectedImage] = useState(null)
   const [watchRotation, setWatchRotation] = useState({ x: -10, y: 25 })
+  const [cartOpen, setCartOpen] = useState(false)
+  const [selectedAdvisor, setSelectedAdvisor] = useState(0)
   const [showAdvisors, setShowAdvisors] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
+  const productDialogRef = useRef(null)
+  const cartDialogRef = useRef(null)
+  const isWatches = filters.category === 'relojes'
+
+  const closeProduct = useCallback(() => setSelected(null), [])
+  const closeCart = useCallback(() => setCartOpen(false), [])
+  useAccessibleDialog(Boolean(selected), closeProduct, productDialogRef)
+  useAccessibleDialog(cartOpen, closeCart, cartDialogRef)
 
   useEffect(() => {
-    Promise.all([
-      fetch(`${apiUrl}/products?limit=48`).then((response) => response.json()),
-      fetch(`${apiUrl}/categories`).then((response) => response.json()),
-    ]).then(async ([productData, categoryData]) => {
-      setCategories(categoryData)
-      const remainingPages = Array.from({ length: Math.max(0, productData.pages - 1) }, (_, index) => index + 2)
-      const remainingProducts = await Promise.all(remainingPages.map((page) => fetch(`${apiUrl}/products?limit=48&page=${page}`).then((response) => response.json())))
-      setProducts([...(productData.items ?? []), ...remainingProducts.flatMap((page) => page.items ?? [])])
-    }).catch(() => setProducts([]))
+    const onHash = () => setView(window.location.hash === '#admin' ? 'admin' : 'store')
+    window.addEventListener('hashchange', onHash)
+    trackEvent('page_view')
+    return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  const visibleProducts = useMemo(() => products.filter((product) => {
-    return product.name.toLowerCase().includes(filters.search.toLowerCase())
-      && (!filters.category || product.category?.slug === filters.category)
-  }).sort((a, b) => {
-    if (filters.sort === 'name') return a.name.localeCompare(b.name)
-    if (filters.sort === 'price-asc') return Number(a.price) - Number(b.price)
-    if (filters.sort === 'price-desc') return Number(b.price) - Number(a.price)
-    return 0
-  }), [products, filters])
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1)
+      setDebouncedSearch(filters.search.trim())
+    }, 350)
+    return () => window.clearTimeout(timer)
+  }, [filters.search])
 
-  const addToCart = (product) => setCart((current) => {
-    const found = current.find((item) => item.id === product.id)
-    return found ? current.map((item) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item) : [...current, { ...product, quantity: 1 }]
-  })
-  const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0)
-  const advisorUrl = (advisor) => {
-    const message = cart.length
-      ? `Hola ${advisor.label}, quiero realizar este pedido:\n${cart.map((item) => `• ${item.name} x${item.quantity} — $${(Number(item.price) * item.quantity).toFixed(2)}`).join('\n')}\n\nTotal: $${total.toFixed(2)}`
-      : `Hola ${advisor.label}, vi el catálogo de KRONOS y quiero información sobre sus productos.`
-    return `https://wa.me/58${advisor.number.slice(1)}?text=${encodeURIComponent(message)}`
+  useEffect(() => {
+    if (view !== 'store') return undefined
+    const controller = new AbortController()
+    fetch(`${apiUrl}/categories`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('No se pudieron cargar las categorías')
+        return response.json()
+      })
+      .then((data) => {
+        setCategories(data)
+        setCategoryError(false)
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') setCategoryError(true)
+      })
+    return () => controller.abort()
+  }, [reloadKey, view])
+
+  useEffect(() => {
+    if (view !== 'store' || !isWatches) {
+      setWatchBrands([])
+      setWatchTypes([])
+      return undefined
+    }
+    const controller = new AbortController()
+    const brandsUrl = `${apiUrl}/brands?category=relojes`
+    const typesParams = new URLSearchParams({ category: 'relojes' })
+    if (filters.brand) typesParams.set('brand', filters.brand)
+
+    Promise.all([
+      fetch(brandsUrl, { signal: controller.signal }).then((response) => response.ok ? response.json() : []),
+      fetch(`${apiUrl}/product-types?${typesParams}`, { signal: controller.signal }).then((response) => response.ok ? response.json() : []),
+    ])
+      .then(([brands, types]) => {
+        setWatchBrands(brands)
+        setWatchTypes(types)
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setWatchBrands([])
+          setWatchTypes([])
+        }
+      })
+    return () => controller.abort()
+  }, [filters.brand, isWatches, reloadKey, view])
+
+  useEffect(() => {
+    if (view !== 'store') return undefined
+    const controller = new AbortController()
+    const params = new URLSearchParams({
+      page: String(page),
+      limit: String(PAGE_SIZE),
+      sort: filters.sort,
+    })
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (filters.category) params.set('category', filters.category)
+    if (filters.brand) params.set('brand', filters.brand)
+    if (filters.type) params.set('type', filters.type)
+
+    if (page === 1) setLoading(true)
+    else setLoadingMore(true)
+    setError('')
+
+    fetch(`${apiUrl}/products?${params}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('No se pudo cargar el catálogo')
+        return response.json()
+      })
+      .then((data) => {
+        setProducts((current) => page === 1 ? (data.items ?? []) : [...current, ...(data.items ?? [])])
+        setPages(data.pages || 1)
+        setTotalProducts(data.total || 0)
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') setError('No pudimos cargar los productos. Revisa tu conexión e inténtalo otra vez.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false)
+          setLoadingMore(false)
+        }
+      })
+    return () => controller.abort()
+  }, [debouncedSearch, filters.brand, filters.category, filters.sort, filters.type, page, reloadKey, view])
+
+  useEffect(() => {
+    localStorage.setItem('kronos-cart', JSON.stringify(cart))
+  }, [cart])
+
+  const changeCategory = (category) => {
+    setFilters((current) => ({ ...current, category, brand: '', type: '' }))
+    setPage(1)
   }
+  const changeBrand = (brand) => {
+    setFilters((current) => ({ ...current, brand, type: '' }))
+    setPage(1)
+  }
+  const changeType = (type) => {
+    setFilters((current) => ({ ...current, type }))
+    setPage(1)
+  }
+  const changeSort = (sort) => {
+    setFilters((current) => ({ ...current, sort }))
+    setPage(1)
+  }
+  const openProduct = (product) => {
+    setSelected(product)
+    setSelectedImage(product.imageUrl || product.images?.[0]?.url || null)
+    setWatchRotation({ x: -10, y: 25 })
+    trackEvent('product_view', { productId: product.id, productName: product.name })
+  }
+  const addToCart = (product) => {
+    setCart((current) => {
+      const found = current.find((item) => item.id === product.id)
+      return found
+        ? current.map((item) => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item)
+        : [...current, { ...product, quantity: 1 }]
+    })
+    trackEvent('add_to_cart', { productId: product.id, productName: product.name })
+  }
+  const updateQuantity = (id, quantity) => {
+    if (quantity < 1) {
+      setCart((current) => current.filter((item) => item.id !== id))
+      return
+    }
+    setCart((current) => current.map((item) => item.id === id ? { ...item, quantity } : item))
+  }
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0)
+  const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0)
+  const totalBs = cart.reduce((sum, item) => sum + Number(item.priceBs || 0) * item.quantity, 0)
+  const cartMessage = `Hola ${advisors[selectedAdvisor].label}, quiero realizar este pedido:\n${cart.map((item) => `• ${item.name} x${item.quantity} — ${money(Number(item.price) * item.quantity)}${item.priceBs != null ? ` (${moneyBs(Number(item.priceBs) * item.quantity)})` : ''}`).join('\n')}\n\nTotal: ${money(total)}${totalBs ? ` / ${moneyBs(totalBs)}` : ''}`
+  const productMessage = (product, advisor) => [
+    `Hola ${advisor.label}, quiero consultar por este producto:`,
+    `${product.name} — ${money(product.price)}${product.priceBs != null ? ` (${moneyBs(product.priceBs)})` : ''}`,
+    product.imageUrl ? `Foto: ${product.imageUrl}` : '',
+  ].filter(Boolean).join('\n')
+  const generalMessage = (advisor) => `Hola ${advisor.label}, vi el catálogo de KRONOS y quiero información sobre sus productos.`
   const rotateWatch = (event) => {
     const bounds = event.currentTarget.getBoundingClientRect()
     setWatchRotation({
@@ -57,16 +393,178 @@ function App() {
     })
   }
 
+  const saveAdminToken = (event) => {
+    event.preventDefault()
+    const token = adminInput.trim()
+    if (!token) return
+    localStorage.setItem(ADMIN_STORAGE_KEY, token)
+    setAdminToken(token)
+    setAdminInput('')
+  }
+
+  const logoutAdmin = () => {
+    localStorage.removeItem(ADMIN_STORAGE_KEY)
+    setAdminToken('')
+    window.location.hash = ''
+    setView('store')
+  }
+
+  if (view === 'admin') {
+    return (
+      <main className="admin-shell">
+        <header>
+          <a className="brand" href="/#" onClick={() => setView('store')}>KRONOS</a>
+          <div className="header-actions"><a href="/#">Volver al catálogo</a></div>
+        </header>
+        {!adminToken ? (
+          <section className="admin-login">
+            <p className="eyebrow">ACCESO PRIVADO</p>
+            <h1>Admin</h1>
+            <p>Solo para el dueño de KRONOS. Ingresa tu token de administración.</p>
+            <form onSubmit={saveAdminToken}>
+              <label>
+                <span className="sr-only">Token admin</span>
+                <input type="password" value={adminInput} onChange={(event) => setAdminInput(event.target.value)} placeholder="Token admin" autoComplete="current-password" />
+              </label>
+              <button type="submit">Entrar</button>
+            </form>
+          </section>
+        ) : (
+          <AdminPanel token={adminToken} onLogout={logoutAdmin} />
+        )}
+      </main>
+    )
+  }
+
   return <main>
-    <header><a className="brand" href="/" aria-label="KRONOS">KRONOS</a><div className="header-actions"><button className="contact-trigger" onClick={() => setShowAdvisors(true)}>Asesores</button><button className="cart-button" onClick={() => setShowAdvisors(true)} disabled={!cart.length}>Carrito ({cart.length})</button></div></header>
-    <section className="hero"><div className="hero-copy"><p className="eyebrow">TIEMPO · ESTILO · PRECISIÓN</p><h1>El tiempo, a tu manera.</h1><p>Relojes, bolsos, bandoleros y regalos seleccionados para ti.</p><a className="hero-cta" href="#catalogo">Explorar colección <span>↓</span></a></div></section>
-    <section className="toolbar"><input aria-label="Buscar productos" placeholder="Buscar productos" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /><select aria-label="Ordenar productos" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })}><option value="recent">Recientes</option><option value="name">Alfabético</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option></select></section>
-    <nav className="mobile-categories" aria-label="Categorías"><button className={!filters.category ? 'active' : ''} onClick={() => setFilters({ ...filters, category: '' })}>Todos</button>{categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => setFilters({ ...filters, category: category.slug })}>{category.name}</button>)}</nav>
-    <section className="catalog" id="catalogo"><aside><h2>Categorías</h2><button className={!filters.category ? 'active' : ''} onClick={() => setFilters({ ...filters, category: '' })}>Todos los productos</button>{categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => setFilters({ ...filters, category: category.slug })}>{category.name} <span>{category._count?.products ?? ''}</span></button>)}</aside>
-      <div className="grid">{visibleProducts.map((product) => <article className="product" key={product.id}><button className="image-button" onClick={() => { setSelected(product); setSelectedImage(product.imageUrl); setWatchRotation({ x: -10, y: 25 }) }}>{product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}</button><p className="product-category">{product.category?.name}</p><h3>{product.name}</h3><strong>${Number(product.price).toFixed(2)}</strong><button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'AGOTADO'}</button></article>)}{!visibleProducts.length && <p className="empty">La colección se mostrará aquí después de importar los productos.</p>}</div>
+    <header>
+      <a className="brand" href="/" aria-label="KRONOS, inicio">KRONOS</a>
+      <div className="header-actions">
+        <a className="admin-link" href="#admin">Admin</a>
+        <button className="contact-trigger" onClick={() => setShowAdvisors(true)}>Asesores</button>
+        <button className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Abrir carrito, ${itemCount} productos`}>Carrito ({itemCount})</button>
+      </div>
+    </header>
+
+    <section className="hero">
+      <div className="hero-copy"><p className="eyebrow">TIEMPO · ESTILO · PRECISIÓN</p><h1>El tiempo, a tu manera.</h1><p>Relojes, bolsos, bandoleros y regalos seleccionados para ti.</p><a className="hero-cta" href="#catalogo">Explorar colección <span>↓</span></a></div>
     </section>
-    {selected && <div className="modal-backdrop" onClick={() => setSelected(null)}><section className="modal" onClick={(event) => event.stopPropagation()}><button className="close" onClick={() => setSelected(null)}>×</button>{selected.category?.name?.toLowerCase() === 'relojes' && <div className="watch-viewer" onPointerMove={rotateWatch} onPointerLeave={() => setWatchRotation({ x: -10, y: 25 })}><div className="watch-3d" style={{ transform: `rotateX(${watchRotation.x}deg) rotateY(${watchRotation.y}deg)` }}><div className="watch-strap top"></div><div className="watch-case">{selectedImage ? <img src={selectedImage} alt={`Vista 3D de ${selected.name}`} /> : <span>12:00</span>}</div><div className="watch-strap bottom"></div></div><p>Mueve el cursor para girar la vista 3D</p></div>}{selectedImage && selected.category?.name?.toLowerCase() !== 'relojes' && <img src={selectedImage} alt={selected.name} />}{selected.images?.length > 1 && <div className="image-gallery">{selected.images.map((image) => <button key={image.id} className={selectedImage === image.url ? 'active' : ''} onClick={() => setSelectedImage(image.url)}><img src={image.url} alt={`Imagen ${image.sortOrder + 1} de ${selected.name}`} /></button>)}</div>}<p className="product-category">{selected.category?.name}</p><h2>{selected.name}</h2><p>{selected.description || 'Producto disponible por encargo.'}</p><strong>${Number(selected.price).toFixed(2)}</strong><button className="add-button" onClick={() => { addToCart(selected); setSelected(null) }}>AGREGAR AL CARRITO</button></section></div>}
-    <div className="whatsapp-widget">{showAdvisors && <section className="advisor-panel" aria-label="Asesores de venta"><button className="advisor-close" onClick={() => setShowAdvisors(false)} aria-label="Cerrar">×</button><strong>Asesores de venta</strong><p>{cart.length ? 'Elige quién atenderá tu pedido' : 'Elige un asesor para conversar'}</p>{advisors.map((advisor) => <a key={advisor.number} href={advisorUrl(advisor)} target="_blank" rel="noreferrer" onClick={() => setShowAdvisors(false)}><span>{advisor.label}</span><small>{advisor.number}</small></a>)}</section>}<button className="whatsapp-float" onClick={() => setShowAdvisors((current) => !current)} aria-label="Elegir asesor de ventas por WhatsApp"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z"/></svg><span>¿Te ayudamos?</span></button></div>
+
+    <section className="toolbar" aria-label="Filtros del catálogo">
+      <label className="search-field"><span className="sr-only">Buscar productos</span><input type="search" placeholder="Buscar productos" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} /></label>
+      <label><span className="sr-only">Ordenar productos</span><select value={filters.sort} onChange={(event) => changeSort(event.target.value)}><option value="recent">Recientes</option><option value="name">Alfabético</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option></select></label>
+    </section>
+
+    <nav className="mobile-categories" aria-label="Categorías">
+      <button className={!filters.category ? 'active' : ''} onClick={() => changeCategory('')}>Todos</button>
+      {categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => changeCategory(category.slug)}>{category.name}</button>)}
+    </nav>
+
+    {isWatches && (
+      <section className="watch-filters" aria-label="Filtros de relojes">
+        <div>
+          <p>Marca</p>
+          <div className="filter-chips">
+            <button className={!filters.brand ? 'active' : ''} onClick={() => changeBrand('')}>Todas</button>
+            {watchBrands.map((brand) => (
+              <button key={brand.id} className={filters.brand === brand.slug ? 'active' : ''} onClick={() => changeBrand(brand.slug)}>
+                {brand.name}{brand._count?.products ? ` (${brand._count.products})` : ''}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p>Tipo</p>
+          <div className="filter-chips">
+            <button className={!filters.type ? 'active' : ''} onClick={() => changeType('')}>Todos</button>
+            {watchTypes.map((type) => (
+              <button key={type.name} className={filters.type === type.name ? 'active' : ''} onClick={() => changeType(type.name)}>
+                {type.name} ({type.count})
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+    )}
+
+    <section className="catalog" id="catalogo">
+      <aside aria-label="Categorías">
+        <h2>Categorías</h2>
+        <button className={!filters.category ? 'active' : ''} onClick={() => changeCategory('')}>Todos los productos</button>
+        {categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => changeCategory(category.slug)}>{category.name} <span>{category._count?.products ?? ''}</span></button>)}
+        {isWatches && !!watchBrands.length && <>
+          <h2 className="aside-subtitle">Marcas</h2>
+          <button className={!filters.brand ? 'active' : ''} onClick={() => changeBrand('')}>Todas las marcas</button>
+          {watchBrands.map((brand) => <button key={brand.id} className={filters.brand === brand.slug ? 'active' : ''} onClick={() => changeBrand(brand.slug)}>{brand.name} <span>{brand._count?.products ?? ''}</span></button>)}
+        </>}
+        {isWatches && !!watchTypes.length && <>
+          <h2 className="aside-subtitle">Tipos</h2>
+          <button className={!filters.type ? 'active' : ''} onClick={() => changeType('')}>Todos los tipos</button>
+          {watchTypes.map((type) => <button key={type.name} className={filters.type === type.name ? 'active' : ''} onClick={() => changeType(type.name)}>{type.name} <span>{type.count}</span></button>)}
+        </>}
+        {categoryError && <small className="aside-error">No se cargaron las categorías.</small>}
+      </aside>
+
+      <div className="catalog-results">
+        {!loading && !error && <p className="result-count" aria-live="polite">Mostrando {products.length} de {totalProducts} productos</p>}
+        {loading && <div className="grid skeleton-grid" aria-label="Cargando productos" aria-busy="true">{Array.from({ length: 8 }, (_, index) => <div className="skeleton-card" key={index}><span /><span /><span /></div>)}</div>}
+        {!loading && error && <div className="status-message" role="alert"><p>{error}</p><button onClick={() => setReloadKey((current) => current + 1)}>Reintentar</button></div>}
+        {!loading && !error && <div className="grid">
+          {products.map((product) => <article className="product" key={product.id}>
+            <button className="image-button" onClick={() => openProduct(product)} aria-label={`Ver detalles de ${product.name}`}>{product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}</button>
+            <p className="product-category">{[product.brand?.name, product.productType || product.category?.name].filter(Boolean).join(' · ')}</p>
+            <h3>{product.name}</h3>
+            <PriceBlock price={product.price} priceBs={product.priceBs} />
+            <button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'AGOTADO'}</button>
+            <details className="consult-menu"><summary>Consultar por WhatsApp</summary><div>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, productMessage(product, advisor))} target="_blank" rel="noreferrer">{advisor.label}</a>)}</div></details>
+          </article>)}
+          {!products.length && <p className="empty">No encontramos productos con esos filtros.</p>}
+        </div>}
+        {!loading && !error && page < pages && <div className="load-more"><button onClick={() => setPage((current) => current + 1)} disabled={loadingMore}>{loadingMore ? 'Cargando…' : `Cargar más (${totalProducts - products.length} restantes)`}</button></div>}
+      </div>
+    </section>
+
+    {selected && <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeProduct()}>
+      <section className="modal product-modal" ref={productDialogRef} role="dialog" aria-modal="true" aria-labelledby="product-dialog-title">
+        <button className="close" onClick={closeProduct} aria-label="Cerrar detalles">×</button>
+        {selected.category?.name?.toLowerCase() === 'relojes' && <div className="watch-viewer" onPointerMove={rotateWatch} onPointerLeave={() => setWatchRotation({ x: -10, y: 25 })}><div className="watch-3d" style={{ transform: `rotateX(${watchRotation.x}deg) rotateY(${watchRotation.y}deg)` }}><div className="watch-strap top" /><div className="watch-case">{selectedImage ? <img src={selectedImage} alt={`Vista de ${selected.name}`} /> : <span>12:00</span>}</div><div className="watch-strap bottom" /></div><p>Mueve el cursor para girar la vista 3D</p></div>}
+        {selectedImage && selected.category?.name?.toLowerCase() !== 'relojes' && <img className="modal-main-image" src={selectedImage} alt={selected.name} />}
+        {selected.images?.length > 1 && <div className="image-gallery">{selected.images.map((image) => <button key={image.id} className={selectedImage === image.url ? 'active' : ''} onClick={() => setSelectedImage(image.url)} aria-label={`Ver imagen ${image.sortOrder + 1}`}><img src={image.url} alt="" /></button>)}</div>}
+        <p className="product-category">{[selected.brand?.name, selected.productType || selected.category?.name].filter(Boolean).join(' · ')}</p>
+        <h2 id="product-dialog-title">{selected.name}</h2>
+        <p>{selected.description || 'Producto disponible por encargo.'}</p>
+        <PriceBlock price={selected.price} priceBs={selected.priceBs} />
+        <button className="add-button" onClick={() => addToCart(selected)} disabled={!selected.available}>{selected.available ? 'AGREGAR AL CARRITO' : 'AGOTADO'}</button>
+        <div className="modal-consult"><p>Consultar por WhatsApp</p>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, productMessage(selected, advisor))} target="_blank" rel="noreferrer">{advisor.label}</a>)}</div>
+      </section>
+    </div>}
+
+    {cartOpen && <div className="modal-backdrop cart-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeCart()}>
+      <section className="cart-drawer" ref={cartDialogRef} role="dialog" aria-modal="true" aria-labelledby="cart-title">
+        <div className="cart-header"><div><p className="eyebrow">TU SELECCIÓN</p><h2 id="cart-title">Carrito</h2></div><button className="close" onClick={closeCart} aria-label="Cerrar carrito">×</button></div>
+        {!cart.length ? <div className="cart-empty"><p>Tu carrito está vacío.</p><button onClick={closeCart}>Seguir explorando</button></div> : <>
+          <div className="cart-items">{cart.map((item) => <article className="cart-item" key={item.id}>
+            {item.imageUrl ? <img src={item.imageUrl} alt="" /> : <div className="cart-placeholder">K</div>}
+            <div className="cart-item-info">
+              <h3>{item.name}</h3>
+              <PriceBlock price={item.price} priceBs={item.priceBs} />
+              <div className="quantity" aria-label={`Cantidad de ${item.name}`}><button onClick={() => updateQuantity(item.id, item.quantity - 1)} aria-label="Disminuir cantidad">−</button><span aria-live="polite">{item.quantity}</span><button onClick={() => updateQuantity(item.id, item.quantity + 1)} aria-label="Aumentar cantidad">+</button></div>
+              <button className="remove-item" onClick={() => updateQuantity(item.id, 0)}>Eliminar</button>
+            </div>
+          </article>)}</div>
+          <div className="cart-checkout">
+            <div className="cart-total"><span>Total</span><div><strong>{money(total)}</strong>{totalBs > 0 && <span className="price-bs">{moneyBs(totalBs)}</span>}</div></div>
+            <fieldset><legend>Elige tu asesor</legend>{advisors.map((advisor, index) => <label key={advisor.number}><input type="radio" name="advisor" checked={selectedAdvisor === index} onChange={() => setSelectedAdvisor(index)} /><span>{advisor.label}<small>{advisor.number}</small></span></label>)}</fieldset>
+            <a className="checkout-button" href={whatsappUrl(advisors[selectedAdvisor], cartMessage)} target="_blank" rel="noreferrer">Enviar pedido por WhatsApp</a>
+          </div>
+        </>}
+      </section>
+    </div>}
+
+    <div className="whatsapp-widget">
+      {showAdvisors && <section className="advisor-panel" aria-label="Asesores de venta"><button className="advisor-close" onClick={() => setShowAdvisors(false)} aria-label="Cerrar">×</button><strong>Asesores de venta</strong><p>Elige un asesor para conversar</p>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, generalMessage(advisor))} target="_blank" rel="noreferrer" onClick={() => setShowAdvisors(false)}><span>{advisor.label}</span><small>{advisor.number}</small></a>)}</section>}
+      <button className="whatsapp-float" onClick={() => setShowAdvisors((current) => !current)} aria-expanded={showAdvisors} aria-label="Elegir asesor de ventas por WhatsApp"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z" /></svg><span>¿Te ayudamos?</span></button>
+    </div>
     <footer>© {new Date().getFullYear()} KRONOS · Asesor 1: {advisors[0].number} · Asesor 2: {advisors[1].number}</footer>
   </main>
 }
