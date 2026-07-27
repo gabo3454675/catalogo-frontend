@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1'
 const PAGE_SIZE = 24
-const ADMIN_STORAGE_KEY = 'kronos-admin-token'
 const SESSION_STORAGE_KEY = 'kronos-session-id'
 const advisors = [
   { label: 'Asesor 1', number: '04241362318' },
@@ -167,7 +166,7 @@ function ActivityChart({ series }) {
   )
 }
 
-function BarChart({ items, labelKey = 'productName', valueKey = 'count', empty = 'Sin datos todavía.' }) {
+function BarChart({ items, labelKey = 'productName', valueKey = 'count', empty = 'Sin datos todavía.', formatValue, barClass }) {
   const rows = (items || []).slice(0, 8)
   const max = Math.max(1, ...rows.map((item) => Number(item[valueKey]) || 0))
   if (!rows.length) return <p className="admin-empty">{empty}</p>
@@ -179,9 +178,9 @@ function BarChart({ items, labelKey = 'productName', valueKey = 'count', empty =
           <li key={`${item.productId || item[labelKey]}-${value}`}>
             <div className="bar-meta">
               <span>{truncateLabel(item[labelKey])}</span>
-              <strong>{value}</strong>
+              <strong>{formatValue ? formatValue(item) : value}</strong>
             </div>
-            <div className="bar-track" aria-hidden="true"><span style={{ width: `${(value / max) * 100}%` }} /></div>
+            <div className="bar-track" aria-hidden="true"><span className={barClass || undefined} style={{ width: `${(value / max) * 100}%` }} /></div>
           </li>
         )
       })}
@@ -329,22 +328,27 @@ function PriceBlock({ price, priceBs, className = '' }) {
   )
 }
 
-function AdminPanel({ token, onLogout }) {
+function AdminPanel({ onLogout }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [reclassifying, setReclassifying] = useState(false)
   const [repricing, setRepricing] = useState(false)
+  const [adminTab, setAdminTab] = useState('resumen')
   const [saleSearch, setSaleSearch] = useState('')
   const [saleResults, setSaleResults] = useState([])
   const [saleNote, setSaleNote] = useState('')
   const [savingSale, setSavingSale] = useState(false)
   const [stockoutSearch, setStockoutSearch] = useState('')
+  const [productSearch, setProductSearch] = useState('')
+  const [productPage, setProductPage] = useState(1)
+  const [productData, setProductData] = useState({ data: [], meta: { total: 0, page: 1, pageSize: 24, totalPages: 0 } })
+  const [productLoading, setProductLoading] = useState(false)
 
   const load = useCallback(() => {
     setLoading(true)
     setError('')
-    fetch(`${apiUrl}/admin/overview`, { headers: { 'X-Kronos-Admin-Token': token } })
+    fetch(`${apiUrl}/admin/overview`, { credentials: 'include' })
       .then((response) => {
         if (!response.ok) throw new Error(response.status === 401 ? 'Token inválido' : 'No se pudo cargar el panel')
         return response.json()
@@ -352,7 +356,7 @@ function AdminPanel({ token, onLogout }) {
       .then(setData)
       .catch((requestError) => setError(requestError.message))
       .finally(() => setLoading(false))
-  }, [token])
+  }, [])
 
   useEffect(() => { load() }, [load])
 
@@ -364,7 +368,7 @@ function AdminPanel({ token, onLogout }) {
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
       fetch(`${apiUrl}/admin/products?search=${encodeURIComponent(saleSearch.trim())}`, {
-        headers: { 'X-Kronos-Admin-Token': token },
+        credentials: 'include',
         signal: controller.signal,
       })
         .then((response) => response.ok ? response.json() : [])
@@ -377,14 +381,39 @@ function AdminPanel({ token, onLogout }) {
       controller.abort()
       window.clearTimeout(timer)
     }
-  }, [saleSearch, token])
+  }, [saleSearch])
+
+  useEffect(() => {
+    if (adminTab !== 'productos') return undefined
+    const controller = new AbortController()
+    setProductLoading(true)
+    const params = new URLSearchParams()
+    const q = productSearch.trim()
+    if (q.length >= 2) params.set('search', q)
+    params.set('page', String(productPage))
+    params.set('pageSize', '24')
+    fetch(`${apiUrl}/admin/products?${params}`, {
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('No se pudieron cargar productos')
+        return response.json()
+      })
+      .then(setProductData)
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') setProductData({ data: [], meta: { total: 0, page: 1, pageSize: 24, totalPages: 0 } })
+      })
+      .finally(() => setProductLoading(false))
+    return () => controller.abort()
+  }, [adminTab, productSearch, productPage])
 
   const reclassify = async () => {
     setReclassifying(true)
     try {
       const response = await fetch(`${apiUrl}/admin/reclassify`, {
         method: 'POST',
-        headers: { 'X-Kronos-Admin-Token': token },
+        credentials: 'include',
       })
       if (!response.ok) throw new Error('No se pudo reclasificar')
       await response.json()
@@ -401,7 +430,7 @@ function AdminPanel({ token, onLogout }) {
     try {
       const response = await fetch(`${apiUrl}/admin/reprice`, {
         method: 'POST',
-        headers: { 'X-Kronos-Admin-Token': token },
+        credentials: 'include',
       })
       if (!response.ok) throw new Error('No se pudo actualizar precios')
       const result = await response.json()
@@ -420,9 +449,9 @@ function AdminPanel({ token, onLogout }) {
     try {
       const response = await fetch(`${apiUrl}/admin/sales`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'X-Kronos-Admin-Token': token,
         },
         body: JSON.stringify({
           productId: product.id,
@@ -445,7 +474,7 @@ function AdminPanel({ token, onLogout }) {
   const removeSale = async (saleId) => {
     const response = await fetch(`${apiUrl}/admin/sales/${saleId}`, {
       method: 'DELETE',
-      headers: { 'X-Kronos-Admin-Token': token },
+      credentials: 'include',
     })
     if (response.ok) load()
   }
@@ -453,6 +482,27 @@ function AdminPanel({ token, onLogout }) {
   if (loading) return <section className="admin-panel"><p className="admin-loading">Cargando panel…</p></section>
   if (error && !data) return <section className="admin-panel"><p className="status-message" role="alert">{error}</p><button onClick={onLogout}>Salir</button></section>
   if (!data) return null
+
+  const exportMetricsCSV = () => {
+    const rows = [
+      ['Métrica', 'Valor'],
+      ['Visitas', String(data.summary.pageViews)],
+      ['Sesiones', String(data.summary.uniqueSessions)],
+      ['Clicks', String(data.summary.productViews)],
+      ['Carrito', String(data.summary.addToCart)],
+      ['Ventas', String(data.summary.salesCount)],
+      ['Revenue', String(data.revenue ?? 0)],
+      ['Ticket promedio', String(data.averageTicket ?? 0)],
+    ]
+    const csv = rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `kronos-metricas-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   const filteredUnavailable = (data.unavailableProducts || []).filter((product) => {
     const q = stockoutSearch.trim().toLowerCase()
@@ -471,6 +521,7 @@ function AdminPanel({ token, onLogout }) {
           <p className="admin-meta">{data.adminEmail} · últimos {data.periodDays} días · {data.summary.productsTotal} productos</p>
         </div>
         <div className="admin-actions">
+          <button type="button" onClick={exportMetricsCSV}>Exportar CSV</button>
           <button type="button" onClick={load}>Actualizar</button>
           <button type="button" onClick={reprice} disabled={repricing}>{repricing ? 'Re-preciando…' : 'Re-preciar'}</button>
           <button type="button" onClick={reclassify} disabled={reclassifying}>{reclassifying ? 'Reclasificando…' : 'Reclasificar'}</button>
@@ -480,6 +531,12 @@ function AdminPanel({ token, onLogout }) {
 
       {error && <p className="admin-error" role="alert">{error}</p>}
 
+      <nav className="admin-tabs" aria-label="Secciones del panel">
+        <button type="button" className={`admin-tab-btn${adminTab === 'resumen' ? ' active' : ''}`} onClick={() => setAdminTab('resumen')}>Resumen</button>
+        <button type="button" className={`admin-tab-btn${adminTab === 'productos' ? ' active' : ''}`} onClick={() => setAdminTab('productos')}>Productos</button>
+      </nav>
+
+      {adminTab === 'resumen' && (<>
       <div className="admin-stats">
         <article><span>Visitas</span><strong>{data.summary.pageViews}</strong></article>
         <article><span>Sesiones</span><strong>{data.summary.uniqueSessions}</strong></article>
@@ -487,6 +544,8 @@ function AdminPanel({ token, onLogout }) {
         <article><span>Carrito</span><strong>{data.summary.addToCart}</strong></article>
         <article className="stat-accent"><span>Ventas</span><strong>{data.summary.salesCount}</strong></article>
         <article className="stat-danger"><span>Sin stock</span><strong>{data.summary.productsUnavailable}</strong></article>
+        <article><span>Ingresos totales</span><strong>{money(data.revenue ?? 0)}</strong></article>
+        <article><span>Ticket promedio</span><strong>{money(data.averageTicket ?? 0)}</strong></article>
       </div>
 
       <div className="admin-charts">
@@ -524,6 +583,20 @@ function AdminPanel({ token, onLogout }) {
             <p>Top productos agregados.</p>
           </div>
           <BarChart items={data.topCartProducts} />
+        </section>
+        <section className="admin-card">
+          <div className="admin-card-head">
+            <h2>Ingresos por categoría</h2>
+            <p>Top 8 por ingresos registrados.</p>
+          </div>
+          <BarChart
+            items={data.revenueByCategory || []}
+            labelKey="category"
+            valueKey="revenue"
+            empty="Sin ventas registradas en el período."
+            formatValue={(item) => `${money(item.revenue)} · ${item.sales} uds`}
+            barClass="revenue"
+          />
         </section>
       </div>
 
@@ -661,13 +734,75 @@ function AdminPanel({ token, onLogout }) {
         ))}
         {!data.syncRuns.length && <p className="admin-empty">Aún no hay sincronizaciones registradas.</p>}
       </section>
+      </>)}
+
+      {adminTab === 'productos' && (
+        <section className="admin-card admin-products">
+          <div className="admin-card-head">
+            <h2>Productos</h2>
+            <p>{productData.meta.total} productos en total.</p>
+          </div>
+          <div className="admin-products-tools">
+            <input
+              type="search"
+              value={productSearch}
+              onChange={(event) => { setProductSearch(event.target.value); setProductPage(1) }}
+              placeholder="Buscar por nombre o SKU…"
+              aria-label="Buscar productos"
+            />
+          </div>
+          {productLoading ? (
+            <p className="admin-loading">Cargando productos…</p>
+          ) : (
+            <>
+              <table className="admin-products-table">
+                <thead>
+                  <tr>
+                    <th>Nombre / SKU</th>
+                    <th>Categoría</th>
+                    <th>Precio</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productData.data.map((product) => (
+                    <tr key={product.id}>
+                      <td>
+                        <strong>{product.name}</strong>
+                        {product.sku && <small>{product.sku}</small>}
+                      </td>
+                      <td>{product.category?.name ?? '—'}</td>
+                      <td>{money(product.price)}</td>
+                      <td>
+                        <span className={`badge${product.available ? '' : ' badge-danger'}`}>
+                          {product.available ? 'Disponible' : 'Sin stock'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {!productData.data.length && (
+                    <tr><td colSpan={4} className="admin-empty">No se encontraron productos.</td></tr>
+                  )}
+                </tbody>
+              </table>
+              {productData.meta.totalPages > 1 && (
+                <div className="admin-products-pagination">
+                  <button type="button" onClick={() => setProductPage((p) => Math.max(1, p - 1))} disabled={productPage <= 1}>← Anterior</button>
+                  <span>Página {productData.meta.page} de {productData.meta.totalPages}</span>
+                  <button type="button" onClick={() => setProductPage((p) => Math.min(productData.meta.totalPages, p + 1))} disabled={productPage >= productData.meta.totalPages}>Siguiente →</button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
     </section>
   )
 }
 
 function App() {
   const [view, setView] = useState(() => (window.location.hash === '#admin' ? 'admin' : 'store'))
-  const [adminToken, setAdminToken] = useState(() => localStorage.getItem(ADMIN_STORAGE_KEY) || '')
+  const [adminAuth, setAdminAuth] = useState('idle') // 'idle' | 'checking' | 'logged-in' | 'logged-out'
   const [adminInput, setAdminInput] = useState('')
   const [products, setProducts] = useState([])
   const [categories, setCategories] = useState([])
@@ -710,6 +845,21 @@ function App() {
     trackEvent('page_view')
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  useEffect(() => {
+    if (view !== 'admin') return undefined
+    setAdminAuth('checking')
+    const controller = new AbortController()
+    fetch(`${apiUrl}/admin/overview`, { credentials: 'include', signal: controller.signal })
+      .then((response) => {
+        if (response.ok) setAdminAuth('logged-in')
+        else setAdminAuth('logged-out')
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setAdminAuth('logged-out')
+      })
+    return () => controller.abort()
+  }, [view])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -852,18 +1002,35 @@ function App() {
   const productMessage = (product, advisor) => buildProductWhatsApp(product, advisor)
   const generalMessage = (advisor) => buildGeneralWhatsApp(advisor)
 
-  const saveAdminToken = (event) => {
+  const loginAdmin = async (event) => {
     event.preventDefault()
     const token = adminInput.trim()
     if (!token) return
-    localStorage.setItem(ADMIN_STORAGE_KEY, token)
-    setAdminToken(token)
-    setAdminInput('')
+    try {
+      const response = await fetch(`${apiUrl}/admin/login`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      })
+      if (response.ok) {
+        setAdminInput('')
+        setAdminAuth('logged-in')
+      } else {
+        window.alert('Token inválido')
+      }
+    } catch {
+      window.alert('Error de conexión')
+    }
   }
 
-  const logoutAdmin = () => {
-    localStorage.removeItem(ADMIN_STORAGE_KEY)
-    setAdminToken('')
+  const logoutAdmin = async () => {
+    try {
+      await fetch(`${apiUrl}/admin/logout`, { method: 'POST', credentials: 'include' })
+    } catch {
+      // ignore — clear local state either way
+    }
+    setAdminAuth('logged-out')
     window.location.hash = ''
     setView('store')
   }
@@ -876,18 +1043,27 @@ function App() {
             <img src="/kronos-logo.jpg" alt="KRONOS" width="160" height="87" />
           </a>
           <div className="header-actions">
-            <a href="/#">Catálogo</a>
+            <a className="admin-tab" href="/#">Catálogo</a>
             <span className="admin-tab active" aria-current="page">Admin</span>
           </div>
         </header>
-        {!adminToken ? (
+        {adminAuth === 'checking' ? (
+          <section className="admin-login">
+            <div className="admin-login-visual" aria-hidden="true" />
+            <div className="admin-login-card">
+              <p className="eyebrow">ACCESO PRIVADO</p>
+              <h1>Admin KRONOS</h1>
+              <p className="admin-loading">Verificando sesión…</p>
+            </div>
+          </section>
+        ) : adminAuth !== 'logged-in' ? (
           <section className="admin-login">
             <div className="admin-login-visual" aria-hidden="true" />
             <div className="admin-login-card">
               <p className="eyebrow">ACCESO PRIVADO</p>
               <h1>Admin KRONOS</h1>
               <p>Solo para el dueño. Los clientes no necesitan login.</p>
-              <form onSubmit={saveAdminToken}>
+              <form onSubmit={loginAdmin}>
                 <label>
                   <span>Token de administración</span>
                   <input type="password" value={adminInput} onChange={(event) => setAdminInput(event.target.value)} placeholder="Pega tu token" autoComplete="current-password" />
@@ -897,7 +1073,7 @@ function App() {
             </div>
           </section>
         ) : (
-          <AdminPanel token={adminToken} onLogout={logoutAdmin} />
+          <AdminPanel onLogout={logoutAdmin} />
         )}
       </main>
     )
