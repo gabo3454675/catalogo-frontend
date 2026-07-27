@@ -450,6 +450,7 @@ aside span { color: var(--muted); font-size: .75rem; }
   height: 100%;
   object-fit: cover;
   transition: transform .35s ease;
+  filter: contrast(1.05) saturate(1.04);
 }
 .image-placeholder {
   height: 100%;
@@ -652,12 +653,15 @@ aside span { color: var(--muted); font-size: .75rem; }
 .modal-media { margin: -24px -24px 18px; }
 .media-stage { position: relative; background: #12100e; }
 .modal-main-image {
-  width: 100% !important;
+  width: auto !important;
+  max-width: 100% !important;
   height: auto !important;
-  aspect-ratio: 1;
-  margin: 0;
+  max-height: min(70dvh, 640px);
+  margin: 0 auto;
   object-fit: contain;
   background: #12100e;
+  filter: contrast(1.06) saturate(1.05);
+  image-rendering: auto;
 }
 .media-nav {
   position: absolute;

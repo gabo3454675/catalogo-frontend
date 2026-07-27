@@ -334,6 +334,7 @@ function AdminPanel({ token, onLogout }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [reclassifying, setReclassifying] = useState(false)
+  const [repricing, setRepricing] = useState(false)
   const [saleSearch, setSaleSearch] = useState('')
   const [saleResults, setSaleResults] = useState([])
   const [saleNote, setSaleNote] = useState('')
@@ -395,6 +396,25 @@ function AdminPanel({ token, onLogout }) {
     }
   }
 
+  const reprice = async () => {
+    setRepricing(true)
+    try {
+      const response = await fetch(`${apiUrl}/admin/reprice`, {
+        method: 'POST',
+        headers: { 'X-Kronos-Admin-Token': token },
+      })
+      if (!response.ok) throw new Error('No se pudo actualizar precios')
+      const result = await response.json()
+      setError('')
+      load()
+      window.alert(`Precios actualizados: ${result.updated ?? 0} de ${result.total ?? '?'}`)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setRepricing(false)
+    }
+  }
+
   const markSold = async (product) => {
     setSavingSale(true)
     try {
@@ -452,6 +472,7 @@ function AdminPanel({ token, onLogout }) {
         </div>
         <div className="admin-actions">
           <button type="button" onClick={load}>Actualizar</button>
+          <button type="button" onClick={reprice} disabled={repricing}>{repricing ? 'Re-preciando…' : 'Re-preciar'}</button>
           <button type="button" onClick={reclassify} disabled={reclassifying}>{reclassifying ? 'Reclasificando…' : 'Reclasificar'}</button>
           <button type="button" className="admin-logout" onClick={onLogout}>Salir</button>
         </div>
