@@ -1,19 +1,19 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --bg: #f7f4ef;
+  --bg: #f3f5f8;
   --bg-elevated: #ffffff;
-  --ink: #171411;
-  --ink-soft: #5e574f;
-  --muted: #8a8176;
-  --line: rgba(23, 20, 17, .08);
-  --line-strong: rgba(23, 20, 17, .16);
-  --rose: #c0907a;
-  --rose-deep: #a8735c;
-  --charcoal: #161311;
-  --danger: #a8332f;
-  --ok: #1f7a45;
-  --ok-soft: #e8f6ed;
+  --ink: #0b0d12;
+  --ink-soft: #4a5160;
+  --muted: #7a8294;
+  --line: rgba(11, 13, 18, .08);
+  --line-strong: rgba(11, 13, 18, .16);
+  --rose: #e6b422;
+  --rose-deep: #c49210;
+  --charcoal: #07090d;
+  --danger: #d62839;
+  --ok: #0f9a55;
+  --ok-soft: #e7f8ef;
   --space-1: 8px;
   --space-2: 12px;
   --space-3: 16px;
@@ -25,7 +25,7 @@
   --font-body: 'Outfit', system-ui, sans-serif;
   --header-h: 68px;
   --touch: 44px;
-  --shadow-soft: 0 18px 40px rgba(22, 19, 17, .12);
+  --shadow-soft: 0 18px 40px rgba(7, 9, 13, .14);
   --ease: 180ms ease;
 }
 
@@ -46,8 +46,8 @@ body {
   font-family: var(--font-body);
   color: var(--ink);
   background:
-    radial-gradient(1200px 500px at 10% -10%, rgba(192, 144, 122, .12), transparent 60%),
-    linear-gradient(180deg, #fbf8f4 0%, var(--bg) 35%, #f3efe8 100%);
+    radial-gradient(1200px 500px at 10% -10%, rgba(230, 180, 34, .14), transparent 60%),
+    linear-gradient(180deg, #f8f9fb 0%, var(--bg) 35%, #eef1f5 100%);
   font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -128,7 +128,7 @@ header {
   letter-spacing: .04em;
   transition: background var(--ease), transform var(--ease);
 }
-.cart-button:hover { background: #d2a48d; transform: translateY(-1px); }
+.cart-button:hover { background: #f0c53a; transform: translateY(-1px); }
 
 /* Hero: full-bleed immersive brand */
 .hero {
@@ -178,7 +178,7 @@ header {
   font-weight: 600;
   letter-spacing: .18em;
   line-height: .95;
-  color: #f3e7dc;
+  color: #f7f1df;
   text-shadow: 0 10px 40px rgba(0,0,0,.45);
 }
 .hero-tag {
@@ -200,7 +200,7 @@ header {
 .hero-lead {
   margin: 0 auto;
   max-width: 36ch;
-  color: rgba(245, 238, 230, .86);
+  color: rgba(247, 241, 223, .88);
   font-size: 1.05rem;
   line-height: 1.55;
   font-weight: 300;
@@ -220,8 +220,8 @@ header {
   margin-top: 28px;
   min-height: var(--touch);
   padding: 0 20px;
-  border: 1px solid rgba(192, 144, 122, .7);
-  background: rgba(22, 19, 17, .35);
+  border: 1px solid rgba(230, 180, 34, .75);
+  background: rgba(7, 9, 13, .4);
   backdrop-filter: blur(8px);
   font-size: .75rem;
   font-weight: 600;
@@ -278,11 +278,11 @@ header {
   width: 100%;
   min-height: 50px;
   padding: 0 16px 0 44px;
-  border: 1px solid rgba(168, 115, 92, .35);
+  border: 1px solid rgba(196, 146, 16, .4);
   background: #fff;
   color: var(--ink);
   border-radius: 2px;
-  box-shadow: 0 10px 28px rgba(22, 19, 17, .07);
+  box-shadow: 0 10px 28px rgba(7, 9, 13, .08);
   font-size: .95rem;
   font-weight: 500;
 }
@@ -410,7 +410,7 @@ aside button {
 aside button:hover,
 aside button.active {
   color: var(--ink);
-  background: rgba(192, 144, 122, .12);
+  background: rgba(230, 180, 34, .14);
 }
 aside span { color: var(--muted); font-size: .75rem; }
 .aside-error { padding: 12px 8px; color: var(--danger); }
@@ -970,10 +970,10 @@ footer {
 .admin-shell {
   min-height: 100vh;
   background:
-    radial-gradient(900px 420px at 10% -10%, rgba(192, 144, 122, .16), transparent 55%),
-    linear-gradient(180deg, #1a1613 0%, #12100e 28%, #f4efe8 28%, #f4efe8 100%);
+    radial-gradient(900px 420px at 10% -10%, rgba(230, 180, 34, .18), transparent 55%),
+    linear-gradient(180deg, #12151c 0%, #0b0d12 28%, #f3f5f8 28%, #f3f5f8 100%);
 }
-.admin-shell header { border-bottom-color: rgba(192, 144, 122, .22); }
+.admin-shell header { border-bottom-color: rgba(230, 180, 34, .28); }
 .admin-login {
   min-height: calc(100dvh - var(--header-h));
   display: grid;
@@ -1187,8 +1187,62 @@ footer {
 }
 .sync-success { color: var(--ok); background: var(--ok-soft); }
 .sync-failed { color: var(--danger); background: #fbeceb; }
-.sync-running { color: var(--rose-deep); background: #f7ebe4; }
+.sync-running { color: var(--rose-deep); background: #fff6d8; }
 .admin-error { color: var(--danger); margin: 0 0 12px; padding: 0 4px; }
+
+.admin-stockout { margin-bottom: 14px; }
+.admin-stockout-tools {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.admin-stockout-tools input {
+  flex: 1;
+  min-height: var(--touch);
+  padding: 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  background: transparent;
+}
+.admin-stockout-tools span {
+  color: var(--muted);
+  font-size: .78rem;
+  white-space: nowrap;
+}
+.admin-stockout-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 420px;
+  overflow: auto;
+  display: grid;
+  gap: 0;
+}
+.admin-stockout-list li {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.admin-stockout-list img,
+.admin-stockout-ph {
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  background: #e8ecf1;
+}
+.admin-stockout-ph {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: .7rem;
+  letter-spacing: .12em;
+}
+.admin-stockout-list strong { display: block; font-size: .9rem; }
+.admin-stockout-list small { display: block; margin-top: 3px; color: var(--danger); font-size: .76rem; }
 
 /* Admin charts */
 .admin-charts {
@@ -1206,10 +1260,10 @@ footer {
   font-size: 11px;
   font-family: var(--font-body);
 }
-.chart-area-views { fill: rgba(192, 144, 122, .18); }
-.chart-line-views { stroke: #c0907a; stroke-width: 2.5; }
-.chart-line-products { stroke: #161311; stroke-width: 2; }
-.chart-line-cart { stroke: #1f7a45; stroke-width: 2; }
+.chart-area-views { fill: rgba(230, 180, 34, .18); }
+.chart-line-views { stroke: #e6b422; stroke-width: 2.5; }
+.chart-line-products { stroke: #0b0d12; stroke-width: 2; }
+.chart-line-cart { stroke: #0f9a55; stroke-width: 2; }
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
@@ -1224,11 +1278,11 @@ footer {
   display: inline-block;
   background: currentColor;
 }
-.swatch.views { color: #c0907a; background: #c0907a; }
-.swatch.products { color: #161311; background: #161311; }
-.swatch.cart { color: #1f7a45; background: #1f7a45; }
-.swatch.available { color: #c0907a; background: #c0907a; }
-.swatch.unavailable { color: #a8332f; background: #a8332f; }
+.swatch.views { color: #e6b422; background: #e6b422; }
+.swatch.products { color: #0b0d12; background: #0b0d12; }
+.swatch.cart { color: #0f9a55; background: #0f9a55; }
+.swatch.available { color: #e6b422; background: #e6b422; }
+.swatch.unavailable { color: #d62839; background: #d62839; }
 .bar-chart,
 .funnel-chart {
   margin: 0;
@@ -1249,32 +1303,32 @@ footer {
 .funnel-meta span { color: var(--ink-soft); }
 .bar-track {
   height: 8px;
-  background: #efe8df;
+  background: #e8ecf1;
   overflow: hidden;
 }
 .bar-track span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #c0907a, #a8735c);
+  background: linear-gradient(90deg, #e6b422, #c49210);
 }
 .funnel-bar {
   height: 12px;
   min-width: 12%;
   transition: width .35s ease;
 }
-.funnel-bar.views { background: #c0907a; }
-.funnel-bar.products { background: #161311; }
-.funnel-bar.cart { background: #1f7a45; }
-.funnel-bar.sales { background: #a8735c; }
+.funnel-bar.views { background: #e6b422; }
+.funnel-bar.products { background: #0b0d12; }
+.funnel-bar.cart { background: #0f9a55; }
+.funnel-bar.sales { background: #c49210; }
 .donut-chart {
   display: grid;
   justify-items: center;
   gap: 12px;
 }
 .donut-chart svg { width: min(180px, 100%); height: auto; }
-.donut-track { fill: none; stroke: #efe8df; }
-.donut-available { fill: none; stroke: #c0907a; }
-.donut-unavailable { fill: none; stroke: #a8332f; }
+.donut-track { fill: none; stroke: #e8ecf1; }
+.donut-available { fill: none; stroke: #e6b422; }
+.donut-unavailable { fill: none; stroke: #d62839; }
 .donut-value {
   fill: var(--ink);
   font-size: 22px;

@@ -338,6 +338,7 @@ function AdminPanel({ token, onLogout }) {
   const [saleResults, setSaleResults] = useState([])
   const [saleNote, setSaleNote] = useState('')
   const [savingSale, setSavingSale] = useState(false)
+  const [stockoutSearch, setStockoutSearch] = useState('')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -433,6 +434,14 @@ function AdminPanel({ token, onLogout }) {
   if (error && !data) return <section className="admin-panel"><p className="status-message" role="alert">{error}</p><button onClick={onLogout}>Salir</button></section>
   if (!data) return null
 
+  const filteredUnavailable = (data.unavailableProducts || []).filter((product) => {
+    const q = stockoutSearch.trim().toLowerCase()
+    if (!q) return true
+    return [product.name, product.sku, product.brand, product.category, product.productType]
+      .filter(Boolean)
+      .some((value) => String(value).toLowerCase().includes(q))
+  })
+
   return (
     <section className="admin-panel">
       <div className="admin-hero-bar">
@@ -496,6 +505,39 @@ function AdminPanel({ token, onLogout }) {
           <BarChart items={data.topCartProducts} />
         </section>
       </div>
+
+      <section className="admin-card admin-stockout">
+        <div className="admin-card-head">
+          <h2>Sin stock · {data.summary.productsUnavailable}</h2>
+          <p>Productos marcados no disponibles según la última sync de VOLKOVAMEN.</p>
+        </div>
+        <div className="admin-stockout-tools">
+          <input
+            type="search"
+            value={stockoutSearch}
+            onChange={(event) => setStockoutSearch(event.target.value)}
+            placeholder="Filtrar sin stock por nombre, ref o marca…"
+            aria-label="Filtrar productos sin stock"
+          />
+          <span>{filteredUnavailable.length} visibles</span>
+        </div>
+        <ul className="admin-stockout-list">
+          {filteredUnavailable.map((product) => (
+            <li key={product.id}>
+              {product.imageUrl ? <img src={product.imageUrl} alt="" /> : <div className="admin-stockout-ph">K</div>}
+              <div>
+                <strong>{product.name}</strong>
+                <small>
+                  {[product.brand, product.category, product.productType].filter(Boolean).join(' · ')}
+                  {product.sku ? ` · Ref ${product.sku}` : ''}
+                  {` · ${money(product.price)}`}
+                </small>
+              </div>
+            </li>
+          ))}
+          {!filteredUnavailable.length && <li className="admin-empty">No hay productos sin stock con ese filtro.</li>}
+        </ul>
+      </section>
 
       <div className="admin-layout">
         <section className="admin-card admin-sales">
