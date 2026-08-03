@@ -60,6 +60,30 @@ function buildGeneralWhatsApp(advisor) {
   ].join('\n')
 }
 
+/**
+ * Mensaje corto optimizado para tráfico de Facebook Marketplace.
+ * Los textos son configurables y deben ajustarse a la política real del negocio.
+ */
+function buildMarketplaceWhatsApp(product) {
+  const productName = product.brand?.name
+    ? `${product.brand.name} ${product.name}`
+    : product.name
+  const skuLine = product.sku ? ` (Ref: ${product.sku})` : ''
+  const productUrl = `${window.location.origin}/#/producto/${product.slug}`
+  const lines = [
+    `Hola, estoy interesado en el ${productName}${skuLine} que vi en la página.`,
+    '',
+    `Ficha del producto: ${productUrl}`,
+  ]
+  return lines.join('\n')
+}
+
+async function fetchProductBySlug(slug) {
+  const response = await fetch(`${apiUrl}/products/${slug}`)
+  if (!response.ok) throw new Error('not-found')
+  return response.json()
+}
+
 function ProductGallery({ product, selectedImage, onSelectImage }) {
   const images = product.images?.length
     ? product.images
@@ -118,6 +142,50 @@ function ProductGallery({ product, selectedImage, onSelectImage }) {
 function truncateLabel(value, max = 22) {
   const text = String(value || '')
   return text.length > max ? `${text.slice(0, max - 1)}…` : text
+}
+
+/**
+ * Sección de garantía / confianza visible en el modal de producto.
+ * Textos configurables — deben ajustarse a la política real del negocio.
+ */
+function ProductWarranty() {
+  return (
+    <div className="product-warranty">
+      <p className="warranty-title">Tu compra está protegida</p>
+      <ul className="warranty-items">
+        <li className="warranty-item">
+          <span className="warranty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+          </span>
+          <span>Garantía de 30 días por maquinaria</span>
+        </li>
+        <li className="warranty-item">
+          <span className="warranty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+              <line x1="12" y1="22.08" x2="12" y2="12" />
+            </svg>
+          </span>
+          <span>Incluye caja de calidad</span>
+        </li>
+        <li className="warranty-item">
+          <span className="warranty-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="1" y="3" width="15" height="13" />
+              <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+              <circle cx="5.5" cy="18.5" r="2.5" />
+              <circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+          </span>
+          <span>Entrega segura en Caracas, Guatire y Guarenas</span>
+        </li>
+      </ul>
+    </div>
+  )
 }
 
 function ActivityChart({ series }) {
@@ -829,12 +897,25 @@ function App() {
   const [cartOpen, setCartOpen] = useState(false)
   const [selectedAdvisor, setSelectedAdvisor] = useState(0)
   const [showAdvisors, setShowAdvisors] = useState(false)
+  const [deepLinkError, setDeepLinkError] = useState('')
   const [reloadKey, setReloadKey] = useState(0)
   const productDialogRef = useRef(null)
   const cartDialogRef = useRef(null)
   const isWatches = filters.category === 'relojes'
 
-  const closeProduct = useCallback(() => setSelected(null), [])
+  const parseProductSlugFromHash = useCallback(() => {
+    const hash = window.location.hash
+    const match = hash.match(/^#\/producto\/(.+)$/)
+    return match ? decodeURIComponent(match[1]) : null
+  }, [])
+
+  const closeProduct = useCallback(() => {
+    setSelected(null)
+    setDeepLinkError('')
+    if (window.location.hash.startsWith('#/producto/')) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search + '#')
+    }
+  }, [])
   const closeCart = useCallback(() => setCartOpen(false), [])
   useAccessibleDialog(Boolean(selected), closeProduct, productDialogRef)
   useAccessibleDialog(cartOpen, closeCart, cartDialogRef)
@@ -845,6 +926,77 @@ function App() {
     trackEvent('page_view')
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  /* Deep linking: open product from hash on mount */
+  useEffect(() => {
+    if (view !== 'store') return undefined
+    const slug = parseProductSlugFromHash()
+    if (!slug || selected) return undefined
+
+    const found = products.find((p) => p.slug === slug)
+    if (found) {
+      openProduct(found)
+      return undefined
+    }
+
+    if (products.length === 0 && loading) return undefined
+
+    let cancelled = false
+    fetchProductBySlug(slug)
+      .then((product) => {
+        if (!cancelled && product) {
+          setSelected(product)
+          setSelectedImage(product.imageUrl || product.images?.[0]?.url || null)
+          window.history.replaceState(null, '', `#/producto/${product.slug}`)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setDeepLinkError('Producto no encontrado. Redirigiendo al catálogo…')
+          window.setTimeout(() => {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search + '#')
+            setDeepLinkError('')
+          }, 2200)
+        }
+      })
+    return () => { cancelled = true }
+  }, [view, products, loading, openProduct, parseProductSlugFromHash])
+
+  /* Deep linking: respond to hashchange (browser back/forward) */
+  useEffect(() => {
+    if (view !== 'store') return undefined
+    let cancelled = false
+    const onHashDeepLink = () => {
+      const slug = parseProductSlugFromHash()
+      if (slug && !selected) {
+        const found = products.find((p) => p.slug === slug)
+        if (found) {
+          openProduct(found)
+        } else if (products.length > 0) {
+          fetchProductBySlug(slug)
+            .then((product) => {
+              if (!cancelled && product) {
+                setSelected(product)
+                setSelectedImage(product.imageUrl || product.images?.[0]?.url || null)
+              }
+            })
+            .catch(() => {
+              if (!cancelled) {
+                setDeepLinkError('Producto no encontrado.')
+                window.setTimeout(() => setDeepLinkError(''), 2000)
+              }
+            })
+        }
+      } else if (!slug && selected) {
+        closeProduct()
+      }
+    }
+    window.addEventListener('hashchange', onHashDeepLink)
+    return () => {
+      cancelled = true
+      window.removeEventListener('hashchange', onHashDeepLink)
+    }
+  }, [view, products, selected, openProduct, parseProductSlugFromHash, closeProduct])
 
   useEffect(() => {
     if (view !== 'admin') return undefined
@@ -974,11 +1126,15 @@ function App() {
     setFilters((current) => ({ ...current, sort }))
     setPage(1)
   }
-  const openProduct = (product) => {
+  const openProduct = useCallback((product) => {
     setSelected(product)
     setSelectedImage(product.imageUrl || product.images?.[0]?.url || null)
+    setDeepLinkError('')
     trackEvent('product_view', { productId: product.id, productName: product.name })
-  }
+    if (product.slug && !window.location.hash.startsWith('#/producto/')) {
+      window.history.pushState(null, '', `#/producto/${product.slug}`)
+    }
+  }, [])
   const addToCart = (product) => {
     setCart((current) => {
       const found = current.find((item) => item.id === product.id)
@@ -999,7 +1155,6 @@ function App() {
   const total = cart.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0)
   const totalBs = cart.reduce((sum, item) => sum + Number(item.priceBs || 0) * item.quantity, 0)
   const cartMessage = buildCartWhatsApp(cart, advisors[selectedAdvisor], total, totalBs)
-  const productMessage = (product, advisor) => buildProductWhatsApp(product, advisor)
   const generalMessage = (advisor) => buildGeneralWhatsApp(advisor)
 
   const loginAdmin = async (event) => {
@@ -1093,7 +1248,7 @@ function App() {
 
     <section className="hero" aria-label="KRONOS">
       <div className="hero-stage">
-        <img className="hero-bg" src="/kronos-logo.jpg" alt="" aria-hidden="true" fetchPriority="high" />
+        <img className="hero-bg" src="/hero-lifestyle.jpg" alt="" aria-hidden="true" fetchPriority="high" />
         <div className="hero-veil" aria-hidden="true" />
         <div className="hero-copy">
           <p className="hero-brand-name">KRONOS</p>
@@ -1180,7 +1335,10 @@ function App() {
             <h3>{product.name}</h3>
             <PriceBlock price={product.price} priceBs={product.priceBs} />
             <button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'SIN STOCK'}</button>
-            <details className="consult-menu"><summary>Consultar por WhatsApp</summary><div>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, productMessage(product, advisor))} target="_blank" rel="noreferrer">{advisor.label}</a>)}</div></details>
+            <a className="product-whatsapp-btn" href={whatsappUrl(advisors[0], buildMarketplaceWhatsApp(product))} target="_blank" rel="noreferrer" aria-label={`Consultar ${product.name} por WhatsApp`}>
+              <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z" /></svg>
+              Consultar
+            </a>
           </article>)}
           {!products.length && <p className="empty">No encontramos productos con esos filtros.</p>}
         </div>}
@@ -1197,10 +1355,26 @@ function App() {
         {!selected.available && <p className="stock-note">Sin stock en VOLKOVAMEN. Puedes consultar por WhatsApp por si vuelve.</p>}
         <p>{selected.description || 'Producto disponible por encargo.'}</p>
         <PriceBlock price={selected.price} priceBs={selected.priceBs} />
-        <button className="add-button" onClick={() => addToCart(selected)} disabled={!selected.available}>{selected.available ? 'AGREGAR AL CARRITO' : 'SIN STOCK'}</button>
-        <div className="modal-consult"><p>Consultar por WhatsApp</p>{advisors.map((advisor) => <a key={advisor.number} href={whatsappUrl(advisor, productMessage(selected, advisor))} target="_blank" rel="noreferrer">{advisor.label}</a>)}</div>
+        <ProductWarranty />
+        <div className="modal-cta-group">
+          <a className="marketplace-whatsapp-btn" href={whatsappUrl(advisors[selectedAdvisor], buildMarketplaceWhatsApp(selected))} target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z" /></svg>
+            Consultar por WhatsApp
+          </a>
+          <div className="marketplace-advisor-select" role="radiogroup" aria-label="Seleccionar asesor">
+            {advisors.map((advisor, index) => (
+              <label key={advisor.number}>
+                <input type="radio" name="modal-advisor" className="sr-only" checked={selectedAdvisor === index} onChange={() => setSelectedAdvisor(index)} />
+                <span>{advisor.label}</span>
+              </label>
+            ))}
+          </div>
+          <button className="add-button modal-add-secondary" onClick={() => addToCart(selected)} disabled={!selected.available}>{selected.available ? 'Agregar al carrito' : 'Sin stock'}</button>
+        </div>
       </section>
     </div>}
+
+    {deepLinkError && <div className="deep-link-toast" role="alert">{deepLinkError}</div>}
 
     {cartOpen && <div className="modal-backdrop cart-backdrop" onMouseDown={(event) => event.target === event.currentTarget && closeCart()}>
       <section className="cart-drawer" ref={cartDialogRef} role="dialog" aria-modal="true" aria-labelledby="cart-title">

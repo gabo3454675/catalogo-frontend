@@ -261,23 +261,24 @@ header.scrolled {
   display: grid;
   align-items: end;
 }
+/* Hero background image — fills the entire hero */
 .hero-bg {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: center 35%;
-  transform: scale(1.04);
-  animation: heroDrift 18s ease-in-out infinite alternate;
+  object-position: center 40%;
+  animation: heroDrift 20s ease-in-out infinite alternate;
 }
 .hero-veil {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(11, 27, 43, 0.28) 0%, rgba(11, 27, 43, 0.45) 42%, rgba(11, 27, 43, 0.88) 100%),
+    linear-gradient(180deg, rgba(11, 27, 43, 0.32) 0%, rgba(11, 27, 43, 0.48) 42%, rgba(11, 27, 43, 0.90) 100%),
     linear-gradient(115deg, rgba(95, 158, 160, 0.30) 0%, transparent 46%, rgba(64, 224, 208, 0.16) 100%),
     radial-gradient(ellipse at 50% 20%, transparent 0%, rgba(0,0,0,.35) 70%),
+    radial-gradient(ellipse at 10% 50%, rgba(11, 27, 43, 0.40) 0%, transparent 50%),
     radial-gradient(ellipse at 20% 80%, rgba(95, 158, 160, 0.22) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 60%, rgba(64, 224, 208, 0.14) 0%, transparent 45%);
   pointer-events: none;
@@ -378,8 +379,8 @@ header.scrolled {
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes heroDrift {
-  from { transform: scale(1.04) translateY(0); }
-  to { transform: scale(1.08) translateY(-1.5%); }
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
 }
 
 /* Toolbar + filters */
@@ -709,79 +710,7 @@ aside span { color: var(--text-muted); font-size: .75rem; }
   background: var(--text-muted);
 }
 
-.consult-menu {
-  position: relative;
-  margin-top: 8px;
-  z-index: 1;
-}
-.product:has(.consult-menu[open]) {
-  position: relative;
-  z-index: 12;
-}
-.consult-menu summary {
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 10px;
-  border: 1px solid rgba(16, 185, 129, .45);
-  background: var(--ok-soft);
-  color: var(--text); /* AA ~12:1 on --ok-soft (was --ok ≈2.3:1). Green identity kept via border + soft bg. */
-  font-size: .72rem;
-  font-weight: 700;
-  letter-spacing: .04em;
-  list-style: none;
-  text-transform: uppercase;
-  border-radius: var(--radius);
-  transition: background var(--motion-fast) ease, color var(--motion-fast) ease, border-color var(--motion-fast) ease;
-}
-.consult-menu summary:hover {
-  background: rgba(16, 185, 129, 0.15);
-}
-.consult-menu summary::-webkit-details-marker { display: none; }
-.consult-menu summary::before {
-  content: '';
-  width: 14px;
-  height: 14px;
-  flex: 0 0 auto;
-  background: currentColor;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Z'/%3E%3C/svg%3E") center / contain no-repeat;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-.consult-menu[open] summary {
-  background: var(--ok);
-  color: var(--text); /* dark on #10B981 ≈6.7:1 — AA (was white ≈2.5:1) */
-  border-color: var(--ok);
-}
-.consult-menu div {
-  position: static;
-  margin-top: 6px;
-  z-index: 12;
-  display: grid;
-  gap: 6px;
-  padding: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.consult-menu a,
-.modal-consult a {
-  min-height: var(--touch);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  background: var(--color-white);
-  border: 1px solid rgba(16, 185, 129, .35);
-  color: var(--text); /* AA (was --ok ≈2.5:1 on white) */
-  font-weight: 600;
-  font-size: .82rem;
-  transition: background var(--motion-fast) ease, border-color var(--motion-fast) ease;
-}
-.consult-menu a:hover,
-.modal-consult a:hover { background: var(--ok-soft); border-color: rgba(16, 185, 129, .5); }
-.consult-menu a:active,
-.modal-consult a:active { background: var(--ok-soft); }
+
 
 /* ── Product card: entrance stagger (pure CSS — no per-item JS vars) ── */
 .grid .product {
@@ -975,21 +904,6 @@ aside span { color: var(--text-muted); font-size: .75rem; }
   transition: background var(--motion-fast) ease, transform var(--motion-fast) ease;
 }
 .close:hover { background: var(--color-white); transform: scale(1.05); }
-.modal-consult {
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.modal-consult p {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: var(--text-soft);
-  font-size: .78rem;
-  font-weight: 600;
-}
 
 /* Cart */
 .cart-backdrop {
@@ -1795,6 +1709,217 @@ footer {
 }
 
 /* ─────────────────────────────────────────────────────────────
+ * Marketplace MVP — Warranty, WhatsApp CTA, Deep link toast
+ * ───────────────────────────────────────────────────────────── */
+
+/* Warranty trust strip */
+.product-warranty {
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.product-warranty .warranty-title {
+  margin: 0 0 10px;
+  font-size: .68rem;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+.warranty-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.warranty-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.warranty-icon {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary-deep);
+}
+.warranty-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.warranty-item span {
+  font-size: .72rem;
+  font-weight: 500;
+  color: var(--text-soft);
+  line-height: 1.35;
+}
+
+/* WhatsApp Marketplace CTA in modal — reversed order: WhatsApp first */
+.modal-cta-group {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 10px;
+}
+.marketplace-whatsapp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 0 18px;
+  border: 0;
+  background: var(--color-whatsapp);
+  color: var(--text); /* dark on #25D366 ≈8.5:1 — AAA (was white ≈2.0:1, WCAG fail) */
+  font-size: .88rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  border-radius: var(--radius);
+  transition: background var(--motion-fast) ease, transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+.marketplace-whatsapp-btn:hover {
+  background: #1fb855;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px rgba(37, 211, 102, 0.35);
+}
+.marketplace-whatsapp-btn:active {
+  transform: translateY(0) scale(.98);
+  box-shadow: none;
+}
+.marketplace-whatsapp-btn svg {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
+/* Advisor selector — compact, below WhatsApp */
+.marketplace-advisor-select {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+}
+.marketplace-advisor-select label {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+.marketplace-advisor-select label > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--color-white);
+  color: var(--text-soft);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+  cursor: pointer;
+  border-radius: var(--radius);
+  transition: border-color var(--motion-fast) ease, color var(--motion-fast) ease, background var(--motion-fast) ease;
+}
+.marketplace-advisor-select label > span:hover {
+  border-color: var(--color-primary);
+  color: var(--text);
+}
+.marketplace-advisor-select input:checked + span {
+  border-color: var(--color-primary-deep);
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
+/* Secondary CTA in modal — ghost/outline, less prominent */
+.modal-add-secondary {
+  background: transparent;
+  color: var(--text-soft);
+  border: 1px solid var(--border-strong);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.modal-add-secondary:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--color-primary);
+  transform: none;
+  box-shadow: none;
+}
+.modal-add-secondary:active:not(:disabled) { transform: scale(.98); }
+.modal-add-secondary:disabled {
+  opacity: .35;
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
+/* ── Product card: direct WhatsApp button ── */
+.product-whatsapp-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--touch);
+  margin-top: 8px;
+  padding: 0 12px;
+  border: 0;
+  background: var(--color-whatsapp);
+  color: var(--text); /* dark on #25D366 ≈8.5:1 — AAA */
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  border-radius: var(--radius);
+  transition: background var(--motion-fast) ease, transform var(--motion-fast) ease, box-shadow var(--motion-fast) ease;
+}
+.product-whatsapp-btn:hover {
+  background: #1fb855;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);
+}
+.product-whatsapp-btn:active {
+  transform: translateY(0) scale(.97);
+  box-shadow: none;
+}
+.product-whatsapp-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+/* Deep link not-found toast */
+.deep-link-toast {
+  position: fixed;
+  top: calc(var(--header-h) + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  padding: 12px 20px;
+  background: var(--color-gray-800);
+  color: var(--text-inverse);
+  font-size: .84rem;
+  font-weight: 500;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(11, 27, 43, 0.25);
+  animation: toastIn .35s var(--ease-out) both;
+  pointer-events: none;
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ─────────────────────────────────────────────────────────────
  * T8 — Admin tabs + Products table
  * ───────────────────────────────────────────────────────────── */
 
@@ -1984,7 +2109,6 @@ footer {
   .toolbar .search-field { max-width: none; }
   .toolbar .search-field input { min-height: 52px; font-size: 1rem; }
   .toolbar select { width: 100%; min-width: 0; min-height: 48px; }
-  .consult-menu summary { font-size: .68rem; letter-spacing: .03em; padding: 0 8px; }
   .mobile-categories { padding-left: 16px; padding-right: 16px; }
   .watch-filters { padding: 12px 16px 6px; }
   .catalog { padding: 20px 12px 80px; }
@@ -2007,7 +2131,10 @@ footer {
     top: 6px;
     margin-bottom: -34px;
   }
-  .modal-consult { grid-template-columns: 1fr; }
+  .warranty-items { grid-template-columns: 1fr; gap: 12px; }
+  .warranty-item { flex-direction: row; text-align: left; gap: 10px; }
+  .warranty-icon { width: 28px; height: 28px; }
+  .warranty-icon svg { width: 20px; height: 20px; }
   .cart-drawer { width: 100%; }
   .cart-header { padding-left: 16px; }
   .cart-items { padding-left: 16px; padding-right: 16px; }
@@ -2016,6 +2143,8 @@ footer {
   .cart-item > img,
   .cart-placeholder { width: 72px; height: 90px; }
   .add-button { min-height: 48px; }
+  .modal-cta-group { margin-top: 14px; padding-top: 12px; }
+  .marketplace-whatsapp-btn { min-height: 48px; font-size: .84rem; }
 }
 
 @media (max-width: 480px) {
@@ -2025,6 +2154,7 @@ footer {
   .whatsapp-float span { display: none; }
   .whatsapp-float { width: 54px; padding: 11px; justify-content: center; }
   .add-button { min-height: 48px; font-size: .75rem; }
+  .product-whatsapp-btn { font-size: .7rem; min-height: 40px; }
   .product:hover .image-button { box-shadow: none; transform: none; }
 }
 
