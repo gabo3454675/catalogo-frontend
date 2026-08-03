@@ -641,7 +641,53 @@ function AdminPanel({ onLogout }) {
         <article className="stat-danger"><span>Sin stock</span><strong>{data.summary.productsUnavailable}</strong></article>
         <article><span>Ingresos totales</span><strong>{money(data.revenue ?? 0)}</strong></article>
         <article><span>Ticket promedio</span><strong>{money(data.averageTicket ?? 0)}</strong></article>
+        <article><span>Catálogo</span><strong>{data.summary.productsTotal}</strong><small>{data.summary.productsAvailable ?? '—'} disp.</small></article>
+        <article><span>Relojes estilo</span><strong>{data.summary.styleWatches ?? 0}</strong><small>{data.summary.styleWatchesAvailable ?? 0} disp.</small></article>
+        <article><span>Relojería original</span><strong>{data.summary.originalWatches ?? 0}</strong><small>{data.summary.originalWatchesAvailable ?? 0} disp.</small></article>
       </div>
+
+      {(data.catalogByCategory?.length || data.syncStatus) && (
+        <div className="admin-catalog-panels">
+          {!!data.catalogByCategory?.length && (
+            <section className="admin-card">
+              <div className="admin-card-head">
+                <h2>Inventario por categoría</h2>
+                <p>Totales al día, incluyendo imitación y originales.</p>
+              </div>
+              <ul className="admin-category-list">
+                {data.catalogByCategory.map((row) => (
+                  <li key={row.slug}>
+                    <span>{row.name}</span>
+                    <strong>{row.available}/{row.total}</strong>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {data.syncStatus && (
+            <section className="admin-card">
+              <div className="admin-card-head">
+                <h2>Sync automático</h2>
+                <p>VOLKOVA {data.syncStatus.schedule?.volkova} · Original {data.syncStatus.schedule?.original}</p>
+              </div>
+              <div className="admin-sync-status-grid">
+                <article>
+                  <p className="eyebrow">VOLKOVA / estilo</p>
+                  <strong className={`sync-status sync-${data.syncStatus.volkova?.status || 'idle'}`}>{data.syncStatus.volkova?.status || 'sin datos'}</strong>
+                  <p>{data.syncStatus.volkova ? new Date(data.syncStatus.volkova.startedAt).toLocaleString('es-VE') : 'Aún no hay sync'}</p>
+                  {data.syncStatus.volkova && <p>Encontrados {data.syncStatus.volkova.productsFound} · Nuevos {data.syncStatus.volkova.productsAdded}</p>}
+                </article>
+                <article>
+                  <p className="eyebrow">Lua + Ecko / original</p>
+                  <strong className={`sync-status sync-${data.syncStatus.original?.status || 'idle'}`}>{data.syncStatus.original?.status || 'sin datos'}</strong>
+                  <p>{data.syncStatus.original ? new Date(data.syncStatus.original.startedAt).toLocaleString('es-VE') : 'Aún no hay sync'}</p>
+                  {data.syncStatus.original && <p>Encontrados {data.syncStatus.original.productsFound} · Nuevos {data.syncStatus.original.productsAdded}</p>}
+                </article>
+              </div>
+            </section>
+          )}
+        </div>
+      )}
 
       <div className="admin-charts">
         <section className="admin-card admin-chart-wide">
@@ -661,7 +707,7 @@ function AdminPanel({ onLogout }) {
         <section className="admin-card">
           <div className="admin-card-head">
             <h2>Stock</h2>
-            <p>Disponibles vs sin stock VOLKOVA.</p>
+            <p>Disponibles vs sin stock del catálogo completo.</p>
           </div>
           <StockDonut total={data.summary.productsTotal} unavailable={data.summary.productsUnavailable} />
         </section>
@@ -809,13 +855,14 @@ function AdminPanel({ onLogout }) {
 
       <section className="admin-card admin-syncs">
         <div className="admin-card-head">
-          <h2>Importaciones VOLKOVAMEN</h2>
-          <p>El stock en rojo del catálogo se actualiza aquí.</p>
+          <h2>Historial de importaciones</h2>
+          <p>VOLKOVA (estilo) y Lua/Ecko (original). El stock se actualiza por fuente, sin cruzarse.</p>
         </div>
         {data.syncRuns.map((run) => (
           <article key={run.id} className="admin-sync">
             <div className="admin-sync-top">
               <strong className={`sync-status sync-${run.status}`}>{run.status}</strong>
+              <span className="sync-source">{run.source === 'original' ? 'Original · Lua/Ecko' : 'Estilo · VOLKOVA'}</span>
               <span>{new Date(run.startedAt).toLocaleString('es-VE')}</span>
             </div>
             <p>Encontrados: {run.productsFound} · Nuevos: {run.productsAdded} · Sin stock: {run.productsUnavailable ?? 0}</p>
