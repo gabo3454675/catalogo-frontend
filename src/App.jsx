@@ -935,6 +935,15 @@ function App() {
       window.history.replaceState(null, '', window.location.pathname + window.location.search + '#')
     }
   }, [])
+  const openProduct = useCallback((product) => {
+    setSelected(product)
+    setSelectedImage(product.imageUrl || product.images?.[0]?.url || null)
+    setDeepLinkError('')
+    trackEvent('product_view', { productId: product.id, productName: product.name })
+    if (product.slug && !window.location.hash.startsWith('#/producto/')) {
+      window.history.pushState(null, '', `#/producto/${product.slug}`)
+    }
+  }, [])
   const closeCart = useCallback(() => setCartOpen(false), [])
   useAccessibleDialog(Boolean(selected), closeProduct, productDialogRef)
   useAccessibleDialog(cartOpen, closeCart, cartDialogRef)
@@ -979,7 +988,7 @@ function App() {
         }
       })
     return () => { cancelled = true }
-  }, [view, products, loading, openProduct, parseProductSlugFromHash])
+  }, [view, products, loading, openProduct, parseProductSlugFromHash, selected])
 
   /* Deep linking: respond to hashchange (browser back/forward) */
   useEffect(() => {
@@ -1145,15 +1154,6 @@ function App() {
     setFilters((current) => ({ ...current, sort }))
     setPage(1)
   }
-  const openProduct = useCallback((product) => {
-    setSelected(product)
-    setSelectedImage(product.imageUrl || product.images?.[0]?.url || null)
-    setDeepLinkError('')
-    trackEvent('product_view', { productId: product.id, productName: product.name })
-    if (product.slug && !window.location.hash.startsWith('#/producto/')) {
-      window.history.pushState(null, '', `#/producto/${product.slug}`)
-    }
-  }, [])
   const addToCart = (product) => {
     setCart((current) => {
       const found = current.find((item) => item.id === product.id)
