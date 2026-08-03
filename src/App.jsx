@@ -401,6 +401,7 @@ function AdminPanel({ onLogout }) {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [reclassifying, setReclassifying] = useState(false)
+  const [syncingOriginal, setSyncingOriginal] = useState(false)
   const [repricing, setRepricing] = useState(false)
   const [adminTab, setAdminTab] = useState('resumen')
   const [saleSearch, setSaleSearch] = useState('')
@@ -512,6 +513,23 @@ function AdminPanel({ onLogout }) {
     }
   }
 
+  const syncOriginal = async () => {
+    setSyncingOriginal(true)
+    try {
+      const response = await fetch(`${apiUrl}/admin/sync-original`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      if (!response.ok) throw new Error('No se pudo iniciar la sincronización original')
+      setError('')
+      window.alert('Sincronización de Relojería original iniciada (Lua + Ecko). Puede tardar varios minutos; luego pulsa Actualizar.')
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      setSyncingOriginal(false)
+    }
+  }
+
   const markSold = async (product) => {
     setSavingSale(true)
     try {
@@ -593,6 +611,7 @@ function AdminPanel({ onLogout }) {
           <button type="button" onClick={load}>Actualizar</button>
           <button type="button" onClick={reprice} disabled={repricing}>{repricing ? 'Re-preciando…' : 'Re-preciar'}</button>
           <button type="button" onClick={reclassify} disabled={reclassifying}>{reclassifying ? 'Reclasificando…' : 'Reclasificar'}</button>
+          <button type="button" onClick={syncOriginal} disabled={syncingOriginal}>{syncingOriginal ? 'Sync original…' : 'Sync original'}</button>
           <button type="button" className="admin-logout" onClick={onLogout}>Salir</button>
         </div>
       </div>
@@ -901,7 +920,7 @@ function App() {
   const [reloadKey, setReloadKey] = useState(0)
   const productDialogRef = useRef(null)
   const cartDialogRef = useRef(null)
-  const isWatches = filters.category === 'relojes'
+  const isWatches = filters.category === 'relojes' || filters.category === 'relojeria-original'
 
   const parseProductSlugFromHash = useCallback(() => {
     const hash = window.location.hash
@@ -1046,8 +1065,8 @@ function App() {
       return undefined
     }
     const controller = new AbortController()
-    const brandsUrl = `${apiUrl}/brands?category=relojes`
-    const typesParams = new URLSearchParams({ category: 'relojes' })
+    const brandsUrl = `${apiUrl}/brands?category=${encodeURIComponent(filters.category)}`
+    const typesParams = new URLSearchParams({ category: filters.category })
     if (filters.brand) typesParams.set('brand', filters.brand)
 
     Promise.all([
@@ -1065,7 +1084,7 @@ function App() {
         }
       })
     return () => controller.abort()
-  }, [filters.brand, isWatches, reloadKey, view])
+  }, [filters.brand, filters.category, isWatches, reloadKey, view])
 
   useEffect(() => {
     if (view !== 'store') return undefined
@@ -1258,6 +1277,17 @@ function App() {
           <a className="hero-cta" href="#catalogo">Explorar colección <span aria-hidden="true">↓</span></a>
         </div>
       </div>
+    </section>
+
+    <section className="original-rail" aria-label="Relojería original">
+      <div className="original-rail-copy">
+        <p className="original-rail-kicker">Colección certificada</p>
+        <h2>Relojería original</h2>
+        <p>Piezas 100% originales desde Lua Joyería y Ecko Joyas: Citizen, Seiko, Tissot, Cartier, TAG Heuer y más.</p>
+      </div>
+      <button type="button" className="original-rail-cta" onClick={() => changeCategory('relojeria-original')}>
+        Ver relojería original
+      </button>
     </section>
 
     <section className="toolbar" aria-label="Filtros del catálogo">

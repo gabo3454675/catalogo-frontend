@@ -383,6 +383,61 @@ header.scrolled {
   to { transform: scale(1.06); }
 }
 
+/* Relojería original rail */
+.original-rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: clamp(16px, 3vw, 28px);
+  padding: clamp(28px, 5vw, 40px) max(20px, 5vw);
+  border-bottom: 1px solid var(--border);
+  background:
+    linear-gradient(120deg, rgba(11, 27, 43, 0.96) 0%, rgba(18, 52, 72, 0.94) 55%, rgba(95, 158, 160, 0.55) 100%),
+    radial-gradient(ellipse at 80% 20%, rgba(64, 224, 208, 0.22), transparent 50%);
+  color: var(--color-gray-50);
+}
+.original-rail-copy {
+  max-width: 42rem;
+}
+.original-rail-kicker {
+  margin: 0 0 8px;
+  font-size: .78rem;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: rgba(64, 224, 208, 0.95);
+}
+.original-rail h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: clamp(1.8rem, 4vw, 2.6rem);
+  font-weight: 600;
+  letter-spacing: .04em;
+  line-height: 1.05;
+}
+.original-rail p:last-child {
+  margin: 0;
+  max-width: 36rem;
+  color: rgba(250, 251, 253, 0.82);
+  line-height: 1.55;
+}
+.original-rail-cta {
+  min-height: 48px;
+  padding: 0 22px;
+  border: 1px solid rgba(250, 251, 253, 0.35);
+  border-radius: var(--radius);
+  background: rgba(250, 251, 253, 0.1);
+  color: var(--color-gray-50);
+  font-weight: 600;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: background .2s ease, transform .2s ease;
+}
+.original-rail-cta:hover {
+  background: rgba(64, 224, 208, 0.22);
+  transform: translateY(-1px);
+}
+
 /* Toolbar + filters */
 .toolbar {
   display: flex;
