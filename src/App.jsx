@@ -396,6 +396,14 @@ function PriceBlock({ price, priceBs, className = '' }) {
   )
 }
 
+/** Etiquetas públicas para separar imitación vs originales. */
+function categoryLabel(category) {
+  if (!category) return ''
+  if (category.slug === 'relojes') return 'Relojes estilo'
+  if (category.slug === 'relojeria-original') return 'Relojería original'
+  return category.name
+}
+
 function AdminPanel({ onLogout }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -1279,15 +1287,23 @@ function App() {
       </div>
     </section>
 
-    <section className="original-rail" aria-label="Relojería original">
-      <div className="original-rail-copy">
-        <p className="original-rail-kicker">Colección certificada</p>
+    <section className="collection-rails" aria-label="Colecciones de relojería">
+      <article className="collection-card collection-card-style">
+        <p className="collection-kicker">Colección estilo</p>
+        <h2>Relojes imitación</h2>
+        <p>Diseños de moda inspirados en las grandes marcas. Ideal para uso diario con gran variedad y mejor precio.</p>
+        <button type="button" className="collection-cta" onClick={() => { changeCategory('relojes'); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}>
+          Ver relojes estilo
+        </button>
+      </article>
+      <article className="collection-card collection-card-original">
+        <p className="collection-kicker">Colección certificada</p>
         <h2>Relojería original</h2>
         <p>Piezas 100% originales desde Lua Joyería y Ecko Joyas: Citizen, Seiko, Tissot, Cartier, TAG Heuer y más.</p>
-      </div>
-      <button type="button" className="original-rail-cta" onClick={() => changeCategory('relojeria-original')}>
-        Ver relojería original
-      </button>
+        <button type="button" className="collection-cta" onClick={() => { changeCategory('relojeria-original'); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}>
+          Ver relojería original
+        </button>
+      </article>
     </section>
 
     <section className="toolbar" aria-label="Filtros del catálogo">
@@ -1303,7 +1319,7 @@ function App() {
 
     <nav className="mobile-categories" aria-label="Categorías">
       <button className={!filters.category ? 'active' : ''} onClick={() => changeCategory('')}>Todos</button>
-      {categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => changeCategory(category.slug)}>{category.name}</button>)}
+      {categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => changeCategory(category.slug)}>{categoryLabel(category)}</button>)}
     </nav>
 
     {isWatches && (
@@ -1337,7 +1353,7 @@ function App() {
       <aside aria-label="Categorías">
         <h2>Categorías</h2>
         <button className={!filters.category ? 'active' : ''} onClick={() => changeCategory('')}>Todos los productos</button>
-        {categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => changeCategory(category.slug)}>{category.name} <span>{category._count?.products ?? ''}</span></button>)}
+        {categories.map((category) => <button key={category.id} className={filters.category === category.slug ? 'active' : ''} onClick={() => changeCategory(category.slug)}>{categoryLabel(category)} <span>{category._count?.products ?? ''}</span></button>)}
         {isWatches && !!watchBrands.length && <>
           <h2 className="aside-subtitle">Marcas</h2>
           <button className={!filters.brand ? 'active' : ''} onClick={() => changeBrand('')}>Todas las marcas</button>
@@ -1370,7 +1386,13 @@ function App() {
               Consultar
             </a>
           </article>)}
-          {!products.length && <p className="empty">No encontramos productos con esos filtros.</p>}
+          {!products.length && (
+            <p className="empty">
+              {filters.category === 'relojeria-original'
+                ? 'Aún no hay relojería original cargada. En Admin pulsa “Sync original” para importar Lua y Ecko.'
+                : 'No encontramos productos con esos filtros.'}
+            </p>
+          )}
         </div>}
         {!loading && !error && page < pages && <div className="load-more"><button onClick={() => setPage((current) => current + 1)} disabled={loadingMore}>{loadingMore ? 'Cargando…' : `Cargar más (${totalProducts - products.length} restantes)`}</button></div>}
       </div>

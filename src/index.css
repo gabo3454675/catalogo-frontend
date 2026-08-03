@@ -383,59 +383,87 @@ header.scrolled {
   to { transform: scale(1.06); }
 }
 
-/* Relojería original rail */
-.original-rail {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: clamp(16px, 3vw, 28px);
-  padding: clamp(28px, 5vw, 40px) max(20px, 5vw);
+/* Colecciones: imitación vs original */
+.collection-rails {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  padding: clamp(20px, 4vw, 32px) max(20px, 5vw);
   border-bottom: 1px solid var(--border);
   background:
-    linear-gradient(120deg, rgba(11, 27, 43, 0.96) 0%, rgba(18, 52, 72, 0.94) 55%, rgba(95, 158, 160, 0.55) 100%),
-    radial-gradient(ellipse at 80% 20%, rgba(64, 224, 208, 0.22), transparent 50%);
+    linear-gradient(180deg, rgba(245, 248, 250, 0.95), rgba(250, 251, 253, 0.7));
+}
+@media (min-width: 860px) {
+  .collection-rails {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+}
+.collection-card {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: clamp(22px, 4vw, 32px);
+  border-radius: calc(var(--radius) + 4px);
   color: var(--color-gray-50);
+  min-height: 210px;
 }
-.original-rail-copy {
-  max-width: 42rem;
+.collection-card h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.55rem, 3.4vw, 2.2rem);
+  font-weight: 600;
+  letter-spacing: .03em;
+  line-height: 1.08;
 }
-.original-rail-kicker {
-  margin: 0 0 8px;
-  font-size: .78rem;
+.collection-card > p:not(.collection-kicker) {
+  margin: 0;
+  max-width: 34rem;
+  color: rgba(250, 251, 253, 0.84);
+  line-height: 1.5;
+  font-size: .95rem;
+}
+.collection-kicker {
+  margin: 0;
+  font-size: .72rem;
   letter-spacing: .18em;
   text-transform: uppercase;
-  color: rgba(64, 224, 208, 0.95);
 }
-.original-rail h2 {
-  margin: 0 0 10px;
-  font-family: var(--font-display);
-  font-size: clamp(1.8rem, 4vw, 2.6rem);
-  font-weight: 600;
-  letter-spacing: .04em;
-  line-height: 1.05;
-}
-.original-rail p:last-child {
-  margin: 0;
-  max-width: 36rem;
-  color: rgba(250, 251, 253, 0.82);
-  line-height: 1.55;
-}
-.original-rail-cta {
-  min-height: 48px;
-  padding: 0 22px;
+.collection-cta {
+  justify-self: start;
+  margin-top: 8px;
+  min-height: 46px;
+  padding: 0 18px;
   border: 1px solid rgba(250, 251, 253, 0.35);
   border-radius: var(--radius);
   background: rgba(250, 251, 253, 0.1);
   color: var(--color-gray-50);
   font-weight: 600;
-  letter-spacing: .04em;
+  letter-spacing: .03em;
   cursor: pointer;
   transition: background .2s ease, transform .2s ease;
 }
-.original-rail-cta:hover {
-  background: rgba(64, 224, 208, 0.22);
+.collection-cta:hover {
+  background: rgba(250, 251, 253, 0.18);
   transform: translateY(-1px);
+}
+.collection-card-style {
+  background:
+    linear-gradient(135deg, rgba(42, 36, 28, 0.96) 0%, rgba(78, 58, 36, 0.92) 55%, rgba(166, 124, 62, 0.72) 100%);
+}
+.collection-card-style .collection-kicker {
+  color: rgba(242, 201, 140, 0.95);
+}
+.collection-card-original {
+  background:
+    linear-gradient(120deg, rgba(11, 27, 43, 0.97) 0%, rgba(18, 52, 72, 0.94) 55%, rgba(95, 158, 160, 0.58) 100%),
+    radial-gradient(ellipse at 80% 20%, rgba(64, 224, 208, 0.22), transparent 50%);
+}
+.collection-card-original .collection-kicker {
+  color: rgba(64, 224, 208, 0.95);
+}
+.collection-card-original .collection-cta:hover {
+  background: rgba(64, 224, 208, 0.22);
 }
 
 /* Toolbar + filters */
