@@ -36,13 +36,6 @@
       "description": "Ver productos KRONOS",
       "url": "/#catalogo",
       "icons": [{ "src": "/kronos-icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Admin",
-      "short_name": "Admin",
-      "description": "Panel de control del dueño",
-      "url": "/#admin",
-      "icons": [{ "src": "/kronos-icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

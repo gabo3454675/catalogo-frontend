@@ -2,6 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1'
 const PAGE_SIZE = 24
+/** Ruta secreta del panel (sin link en el header público). */
+const ADMIN_HASH = '#/kx-panel'
+
+function isAdminHash(hash = window.location.hash) {
+  return hash === ADMIN_HASH || hash === '#admin'
+}
 
 function adminFetch(url, options = {}) {
   return fetch(url, {
@@ -1000,7 +1006,7 @@ function AdminPanel({ onLogout }) {
 }
 
 function App() {
-  const [view, setView] = useState(() => (window.location.hash === '#admin' ? 'admin' : 'store'))
+  const [view, setView] = useState(() => (isAdminHash() ? 'admin' : 'store'))
   const [adminAuth, setAdminAuth] = useState('idle') // 'idle' | 'checking' | 'logged-in' | 'logged-out'
   const [adminInput, setAdminInput] = useState('')
   const [products, setProducts] = useState([])
@@ -1061,7 +1067,14 @@ function App() {
   useAccessibleDialog(cartOpen, closeCart, cartDialogRef)
 
   useEffect(() => {
-    const onHash = () => setView(window.location.hash === '#admin' ? 'admin' : 'store')
+    const onHash = () => {
+      // Migra el hash viejo #admin a la ruta secreta.
+      if (window.location.hash === '#admin') {
+        window.history.replaceState(null, '', ADMIN_HASH)
+      }
+      setView(isAdminHash() ? 'admin' : 'store')
+    }
+    onHash()
     window.addEventListener('hashchange', onHash)
     trackEvent('page_view')
     return () => window.removeEventListener('hashchange', onHash)
@@ -1251,7 +1264,18 @@ function App() {
   }, [cart])
 
   const changeCategory = (category) => {
-    setFilters((current) => ({ ...current, category, brand: '', type: '' }))
+    setFilters((current) => ({
+      ...current,
+      category,
+      brand: '',
+      type: '',
+      // Originales: agrupar por marca es más usable que “recientes”.
+      sort: category === 'relojeria-original'
+        ? 'brand'
+        : current.sort === 'brand'
+          ? 'recent'
+          : current.sort,
+    }))
     setPage(1)
   }
   const changeBrand = (brand) => {
@@ -1370,7 +1394,6 @@ function App() {
         <img src="/kronos-logo.jpg" alt="KRONOS" width="148" height="81" />
       </a>
       <div className="header-actions">
-        <a className="admin-tab" href="#admin">Admin</a>
         <button className="contact-trigger" onClick={() => setShowAdvisors(true)}>Asesores</button>
         <button className="cart-button" onClick={() => setCartOpen(true)} aria-label={`Abrir carrito, ${itemCount} productos`}>Carrito ({itemCount})</button>
       </div>
@@ -1421,8 +1444,14 @@ function App() {
         </span>
         <input type="search" placeholder="Buscar productos, marca o referencia…" value={filters.search} onChange={(event) => setFilters((current) => ({ ...current, search: event.target.value }))} />
       </label>
-      <label className="sort-field"><span className="sr-only">Ordenar productos</span><select value={filters.sort} onChange={(event) => changeSort(event.target.value)}><option value="recent">Recientes</option><option value="name">Alfabético</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option></select></label>
+      <label className="sort-field"><span className="sr-only">Ordenar productos</span><select value={filters.sort} onChange={(event) => changeSort(event.target.value)}><option value="recent">Recientes</option><option value="brand">Por marca</option><option value="name">Alfabético</option><option value="price-asc">Menor precio</option><option value="price-desc">Mayor precio</option></select></label>
     </section>
+
+    <nav className="collection-quick-filters" aria-label="Colección de relojería">
+      <button type="button" className={!filters.category ? 'active' : ''} onClick={() => changeCategory('')}>Todos</button>
+      <button type="button" className={filters.category === 'relojes' ? 'active' : ''} onClick={() => changeCategory('relojes')}>Imitación</button>
+      <button type="button" className={filters.category === 'relojeria-original' ? 'active' : ''} onClick={() => changeCategory('relojeria-original')}>Original</button>
+    </nav>
 
     <nav className="mobile-categories" aria-label="Categorías">
       <button className={!filters.category ? 'active' : ''} onClick={() => changeCategory('')}>Todos</button>
@@ -1486,16 +1515,17 @@ function App() {
             <button className="image-button" onClick={() => openProduct(product)} aria-label={`Ver detalles de ${product.name}`}>
               {product.imageUrl ? <img src={productImageSrc(product.imageUrl, product.updatedAt)} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}
               {badge && <span className={`collection-badge collection-badge-${badge.tone}`}>{badge.label}</span>}
+              {(product.images?.length || 0) > 1 && (
+                <span className="photo-count-badge" aria-label={`${product.images.length} fotos`}>
+                  {product.images.length} fotos
+                </span>
+              )}
               {!product.available && <span className="stock-badge">Sin stock</span>}
             </button>
             <p className="product-category">{productMetaLine(product)}{productRefLine(product)}</p>
             <h3>{product.name}</h3>
             <PriceBlock price={product.price} priceBs={product.priceBs} />
             <button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'SIN STOCK'}</button>
-            <a className="product-whatsapp-btn" href={whatsappUrl(advisors[0], buildMarketplaceWhatsApp(product))} target="_blank" rel="noreferrer" aria-label={`Consultar ${product.name} por WhatsApp`}>
-              <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z" /></svg>
-              Consultar
-            </a>
           </article>
             )
           })}
