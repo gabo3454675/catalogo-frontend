@@ -2,6 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const apiUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1'
 const PAGE_SIZE = 24
+
+function adminFetch(url, options = {}) {
+  return fetch(url, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      ...options.headers,
+      'X-Requested-With': 'XMLHttpRequest',
+    },
+  })
+}
 const SESSION_STORAGE_KEY = 'kronos-session-id'
 const advisors = [
   { label: 'Asesor 1', number: '04241362318' },
@@ -13,16 +24,41 @@ const moneyBs = (value) => `Bs. ${Math.round(Number(value)).toLocaleString('es-V
 const whatsappUrl = (advisor, message) => `https://wa.me/58${advisor.number.slice(1)}?text=${encodeURIComponent(message)}`
 const catalogOrigin = () => window.location.origin
 
+/** SKU interno sin prefijo de proveedor (ECKO/LUA) para el cliente. */
+function publicSku(sku) {
+  if (!sku) return ''
+  return String(sku).replace(/^(ECKO|LUA)-/i, '')
+}
+
+/** Evita fotos viejas en caché del teléfono tras reimportar. */
+function productImageSrc(url, updatedAt) {
+  if (!url) return url
+  const stamp = updatedAt ? new Date(updatedAt).getTime() : 0
+  if (!stamp) return url
+  return `${url}${url.includes('?') ? '&' : '?'}v=${stamp}`
+}
+
+/** Quita teléfonos / WhatsApp de proveedores en descripciones públicas. */
+function publicDescription(text) {
+  if (!text) return ''
+  return text
+    .replace(/\b(wha?ts?app|whasap|wsp)\b[^.\n]{0,100}/gi, '')
+    .replace(/\b0?4\d{2}[-.\s]?\d{3}[-.\s]?\d{4}\b/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 function buildProductWhatsApp(product, advisor) {
+  const ref = publicSku(product.sku)
   const lines = [
     `Hola ${advisor.label},`,
     '',
     'Vengo del *catálogo KRONOS* y quiero consultar este producto:',
     '',
     `*${product.name}*`,
-    product.sku ? `Ref: ${product.sku}` : null,
+    ref ? `Ref: ${ref}` : null,
     product.brand?.name ? `Marca: ${product.brand.name}` : null,
-    product.category?.name ? `Categoría: ${product.category.name}` : null,
+    product.category?.name ? `Categoría: ${categoryLabel(product.category)}` : null,
     `Precio: ${money(product.price)}${product.priceBs != null ? ` · ${moneyBs(product.priceBs)}` : ''}`,
     product.imageUrl ? `Foto: ${product.imageUrl}` : null,
     '',
@@ -40,7 +76,8 @@ function buildCartWhatsApp(cart, advisor, total, totalBs) {
     ...cart.map((item, index) => {
       const lineTotal = Number(item.price) * item.quantity
       const lineBs = item.priceBs != null ? Number(item.priceBs) * item.quantity : null
-      return `${index + 1}. *${item.name}*${item.sku ? ` (Ref ${item.sku})` : ''}\n   Cant: ${item.quantity} · ${money(lineTotal)}${lineBs != null ? ` · ${moneyBs(lineBs)}` : ''}`
+      const ref = publicSku(item.sku)
+      return `${index + 1}. *${item.name}*${ref ? ` (Ref ${ref})` : ''}\n   Cant: ${item.quantity} · ${money(lineTotal)}${lineBs != null ? ` · ${moneyBs(lineBs)}` : ''}`
     }),
     '',
     `*Total: ${money(total)}${totalBs ? ` · ${moneyBs(totalBs)}` : ''}*`,
@@ -68,7 +105,8 @@ function buildMarketplaceWhatsApp(product) {
   const productName = product.brand?.name
     ? `${product.brand.name} ${product.name}`
     : product.name
-  const skuLine = product.sku ? ` (Ref: ${product.sku})` : ''
+  const ref = publicSku(product.sku)
+  const skuLine = ref ? ` (Ref: ${ref})` : ''
   const productUrl = `${window.location.origin}/#/producto/${product.slug}`
   const lines = [
     `Hola, estoy interesado en el ${productName}${skuLine} que vi en la página.`,
@@ -85,14 +123,18 @@ async function fetchProductBySlug(slug) {
 }
 
 function ProductGallery({ product, selectedImage, onSelectImage }) {
-  const images = product.images?.length
+  const images = (product.images?.length
     ? product.images
     : product.imageUrl
       ? [{ id: 'main', url: product.imageUrl }]
       : []
-  const currentIndex = Math.max(0, images.findIndex((image) => image.url === selectedImage))
+  ).map((image) => ({
+    ...image,
+    displayUrl: productImageSrc(image.url, product.updatedAt),
+  }))
+  const currentIndex = Math.max(0, images.findIndex((image) => image.url === selectedImage || image.displayUrl === selectedImage))
   const safeIndex = currentIndex >= 0 ? currentIndex : 0
-  const imageKey = images.map((image) => image.url).join('|')
+  const imageKey = images.map((image) => image.displayUrl).join('|')
 
   useEffect(() => {
     if (images.length < 2) return undefined
@@ -116,7 +158,7 @@ function ProductGallery({ product, selectedImage, onSelectImage }) {
     <div className="modal-media">
       <div className="media-stage">
         {images.length > 1 && <button type="button" className="media-nav prev" onClick={() => go(-1)} aria-label="Imagen anterior">‹</button>}
-        <img className="modal-main-image" src={selectedImage || images[0].url} alt={product.name} />
+        <img className="modal-main-image" src={productImageSrc(selectedImage || images[0].url, product.updatedAt)} alt={product.name} />
         {images.length > 1 && <button type="button" className="media-nav next" onClick={() => go(1)} aria-label="Imagen siguiente">›</button>}
         {images.length > 1 && <span className="media-count">{safeIndex + 1} / {images.length}</span>}
       </div>
@@ -130,7 +172,7 @@ function ProductGallery({ product, selectedImage, onSelectImage }) {
               onClick={() => onSelectImage(image.url)}
               aria-label={`Ver imagen ${index + 1}`}
             >
-              <img src={image.url} alt="" />
+              <img src={image.displayUrl} alt="" />
             </button>
           ))}
         </div>
@@ -404,6 +446,28 @@ function categoryLabel(category) {
   return category.name
 }
 
+/** Etiqueta clara para el cliente: imitación vs original. */
+function collectionBadge(category) {
+  if (!category?.slug) return null
+  if (category.slug === 'relojeria-original') return { tone: 'original', label: 'Original' }
+  if (category.slug === 'relojes') return { tone: 'style', label: 'Imitación' }
+  return null
+}
+
+function productMetaLine(product) {
+  const collection = categoryLabel(product.category)
+  // En relojes la colección (imitación/original) manda; el tipo queda para filtros.
+  if (product.category?.slug === 'relojeria-original' || product.category?.slug === 'relojes') {
+    return [product.brand?.name, collection].filter(Boolean).join(' · ')
+  }
+  return [product.brand?.name, collection, product.productType].filter(Boolean).join(' · ')
+}
+
+function productRefLine(product) {
+  const ref = publicSku(product.sku)
+  return ref ? ` · Ref ${ref}` : ''
+}
+
 function AdminPanel({ onLogout }) {
   const [data, setData] = useState(null)
   const [error, setError] = useState('')
@@ -425,7 +489,7 @@ function AdminPanel({ onLogout }) {
   const load = useCallback(() => {
     setLoading(true)
     setError('')
-    fetch(`${apiUrl}/admin/overview`, { credentials: 'include' })
+    adminFetch(`${apiUrl}/admin/overview`)
       .then((response) => {
         if (!response.ok) throw new Error(response.status === 401 ? 'Token inválido' : 'No se pudo cargar el panel')
         return response.json()
@@ -444,8 +508,7 @@ function AdminPanel({ onLogout }) {
     }
     const controller = new AbortController()
     const timer = window.setTimeout(() => {
-      fetch(`${apiUrl}/admin/products?search=${encodeURIComponent(saleSearch.trim())}`, {
-        credentials: 'include',
+      adminFetch(`${apiUrl}/admin/products?search=${encodeURIComponent(saleSearch.trim())}`, {
         signal: controller.signal,
       })
         .then((response) => response.ok ? response.json() : [])
@@ -469,8 +532,7 @@ function AdminPanel({ onLogout }) {
     if (q.length >= 2) params.set('search', q)
     params.set('page', String(productPage))
     params.set('pageSize', '24')
-    fetch(`${apiUrl}/admin/products?${params}`, {
-      credentials: 'include',
+    adminFetch(`${apiUrl}/admin/products?${params}`, {
       signal: controller.signal,
     })
       .then((response) => {
@@ -488,9 +550,8 @@ function AdminPanel({ onLogout }) {
   const reclassify = async () => {
     setReclassifying(true)
     try {
-      const response = await fetch(`${apiUrl}/admin/reclassify`, {
+      const response = await adminFetch(`${apiUrl}/admin/reclassify`, {
         method: 'POST',
-        credentials: 'include',
       })
       if (!response.ok) throw new Error('No se pudo reclasificar')
       await response.json()
@@ -505,9 +566,8 @@ function AdminPanel({ onLogout }) {
   const reprice = async () => {
     setRepricing(true)
     try {
-      const response = await fetch(`${apiUrl}/admin/reprice`, {
+      const response = await adminFetch(`${apiUrl}/admin/reprice`, {
         method: 'POST',
-        credentials: 'include',
       })
       if (!response.ok) throw new Error('No se pudo actualizar precios')
       const result = await response.json()
@@ -524,9 +584,8 @@ function AdminPanel({ onLogout }) {
   const syncOriginal = async () => {
     setSyncingOriginal(true)
     try {
-      const response = await fetch(`${apiUrl}/admin/sync-original`, {
+      const response = await adminFetch(`${apiUrl}/admin/sync-original`, {
         method: 'POST',
-        credentials: 'include',
       })
       if (!response.ok) throw new Error('No se pudo iniciar la sincronización original')
       setError('')
@@ -541,9 +600,8 @@ function AdminPanel({ onLogout }) {
   const markSold = async (product) => {
     setSavingSale(true)
     try {
-      const response = await fetch(`${apiUrl}/admin/sales`, {
+      const response = await adminFetch(`${apiUrl}/admin/sales`, {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -566,9 +624,8 @@ function AdminPanel({ onLogout }) {
   }
 
   const removeSale = async (saleId) => {
-    const response = await fetch(`${apiUrl}/admin/sales/${saleId}`, {
+    const response = await adminFetch(`${apiUrl}/admin/sales/${saleId}`, {
       method: 'DELETE',
-      credentials: 'include',
     })
     if (response.ok) load()
   }
@@ -1085,7 +1142,7 @@ function App() {
     if (view !== 'admin') return undefined
     setAdminAuth('checking')
     const controller = new AbortController()
-    fetch(`${apiUrl}/admin/overview`, { credentials: 'include', signal: controller.signal })
+    adminFetch(`${apiUrl}/admin/overview`, { signal: controller.signal })
       .then((response) => {
         if (response.ok) setAdminAuth('logged-in')
         else setAdminAuth('logged-out')
@@ -1236,9 +1293,8 @@ function App() {
     const token = adminInput.trim()
     if (!token) return
     try {
-      const response = await fetch(`${apiUrl}/admin/login`, {
+      const response = await adminFetch(`${apiUrl}/admin/login`, {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token }),
       })
@@ -1255,7 +1311,7 @@ function App() {
 
   const logoutAdmin = async () => {
     try {
-      await fetch(`${apiUrl}/admin/logout`, { method: 'POST', credentials: 'include' })
+      await adminFetch(`${apiUrl}/admin/logout`, { method: 'POST' })
     } catch {
       // ignore — clear local state either way
     }
@@ -1322,7 +1378,11 @@ function App() {
 
     <section className="hero" aria-label="KRONOS">
       <div className="hero-stage">
-        <img className="hero-bg" src="/hero-lifestyle.jpg" alt="" aria-hidden="true" fetchPriority="high" />
+        <picture className="hero-bg-picture" aria-hidden="true">
+          <source srcSet="/hero-lifestyle.avif" type="image/avif" />
+          <source srcSet="/hero-lifestyle.webp" type="image/webp" />
+          <img className="hero-bg" src="/hero-lifestyle.jpg" alt="" fetchPriority="high" />
+        </picture>
         <div className="hero-veil" aria-hidden="true" />
         <div className="hero-copy">
           <p className="hero-brand-name">KRONOS</p>
@@ -1346,7 +1406,7 @@ function App() {
       <article className="collection-card collection-card-original">
         <p className="collection-kicker">Colección certificada</p>
         <h2>Relojería original</h2>
-        <p>Piezas 100% originales desde Lua Joyería y Ecko Joyas: Citizen, Seiko, Tissot, Cartier, TAG Heuer y más.</p>
+        <p>Piezas 100% originales: Citizen, Seiko, Tissot, Cartier, TAG Heuer y más.</p>
         <button type="button" className="collection-cta" onClick={() => { changeCategory('relojeria-original'); document.getElementById('catalogo')?.scrollIntoView({ behavior: 'smooth' }) }}>
           Ver relojería original
         </button>
@@ -1419,12 +1479,16 @@ function App() {
         {loading && <div className="grid skeleton-grid" aria-label="Cargando productos" aria-busy="true">{Array.from({ length: 8 }, (_, index) => <div className="skeleton-card" key={index}><span /><span /><span /></div>)}</div>}
         {!loading && error && <div className="status-message" role="alert"><p>{error}</p><button onClick={() => setReloadKey((current) => current + 1)}>Reintentar</button></div>}
         {!loading && !error && <div className="grid">
-          {products.map((product) => <article className={`product${product.available ? '' : ' unavailable'}`} key={product.id}>
+          {products.map((product) => {
+            const badge = collectionBadge(product.category)
+            return (
+          <article className={`product${product.available ? '' : ' unavailable'}`} key={product.id}>
             <button className="image-button" onClick={() => openProduct(product)} aria-label={`Ver detalles de ${product.name}`}>
-              {product.imageUrl ? <img src={product.imageUrl} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}
+              {product.imageUrl ? <img src={productImageSrc(product.imageUrl, product.updatedAt)} alt={product.name} loading="lazy" decoding="async" /> : <div className="image-placeholder">KRONOS</div>}
+              {badge && <span className={`collection-badge collection-badge-${badge.tone}`}>{badge.label}</span>}
               {!product.available && <span className="stock-badge">Sin stock</span>}
             </button>
-            <p className="product-category">{[product.brand?.name, product.productType || product.category?.name].filter(Boolean).join(' · ')}{product.sku ? ` · Ref ${product.sku}` : ''}</p>
+            <p className="product-category">{productMetaLine(product)}{productRefLine(product)}</p>
             <h3>{product.name}</h3>
             <PriceBlock price={product.price} priceBs={product.priceBs} />
             <button className="add-button" onClick={() => addToCart(product)} disabled={!product.available}>{product.available ? 'AGREGAR' : 'SIN STOCK'}</button>
@@ -1432,11 +1496,13 @@ function App() {
               <svg viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16.04 3A12.74 12.74 0 0 0 5.06 22.2L3 29l7-1.91A12.8 12.8 0 1 0 16.04 3Zm0 23.35c-2.1 0-4.17-.56-5.97-1.62l-.43-.25-4.15 1.13 1.18-4.04-.28-.44a10.25 10.25 0 1 1 9.65 5.22Zm5.62-7.68c-.31-.15-1.82-.9-2.1-1-.28-.1-.49-.15-.69.16-.2.3-.8 1-1 1.2-.18.2-.36.23-.67.08-1.82-.91-3.02-1.63-4.23-3.7-.32-.55.32-.51.91-1.7.1-.2.05-.38-.03-.53-.08-.16-.69-1.66-.95-2.27-.25-.6-.5-.52-.69-.53h-.59c-.2 0-.54.08-.82.38-.28.31-1.08 1.06-1.08 2.58 0 1.51 1.1 2.98 1.26 3.18.15.2 2.17 3.31 5.25 4.64 1.95.84 2.72.91 3.7.77 1.18-.18 1.82-1.21 2.08-2.38.25-1.18.25-2.18.18-2.39-.08-.2-.28-.3-.59-.46Z" /></svg>
               Consultar
             </a>
-          </article>)}
+          </article>
+            )
+          })}
           {!products.length && (
             <p className="empty">
               {filters.category === 'relojeria-original'
-                ? 'Aún no hay relojería original cargada. En Admin pulsa “Sync original” para importar Lua y Ecko.'
+                ? 'Aún no hay relojería original disponible.'
                 : 'No encontramos productos con esos filtros.'}
             </p>
           )}
@@ -1449,10 +1515,19 @@ function App() {
       <section className="modal product-modal" ref={productDialogRef} role="dialog" aria-modal="true" aria-labelledby="product-dialog-title">
         <button className="close" onClick={closeProduct} aria-label="Cerrar detalles">×</button>
         <ProductGallery product={selected} selectedImage={selectedImage} onSelectImage={setSelectedImage} />
-        <p className="product-category">{[selected.brand?.name, selected.productType || selected.category?.name].filter(Boolean).join(' · ')}{selected.sku ? ` · Ref ${selected.sku}` : ''}</p>
+        {(() => {
+          const badge = collectionBadge(selected.category)
+          if (!badge) return null
+          return (
+            <p className={`collection-badge-inline collection-badge-${badge.tone}`}>
+              {badge.label === 'Original' ? 'Relojería original · 100% auténtico' : 'Relojes estilo · imitación'}
+            </p>
+          )
+        })()}
+        <p className="product-category">{productMetaLine(selected)}{productRefLine(selected)}</p>
         <h2 id="product-dialog-title">{selected.name}</h2>
-        {!selected.available && <p className="stock-note">Sin stock en VOLKOVAMEN. Puedes consultar por WhatsApp por si vuelve.</p>}
-        <p>{selected.description || 'Producto disponible por encargo.'}</p>
+        {!selected.available && <p className="stock-note">Sin stock por ahora. Puedes consultar por WhatsApp por si vuelve.</p>}
+        <p>{publicDescription(selected.description) || 'Producto disponible por encargo.'}</p>
         <PriceBlock price={selected.price} priceBs={selected.priceBs} />
         <ProductWarranty />
         <div className="modal-cta-group">
@@ -1480,7 +1555,7 @@ function App() {
         <div className="cart-header"><div><p className="eyebrow">TU SELECCIÓN</p><h2 id="cart-title">Carrito</h2></div><button className="close" onClick={closeCart} aria-label="Cerrar carrito">×</button></div>
         {!cart.length ? <div className="cart-empty"><p>Tu carrito está vacío.</p><button onClick={closeCart}>Seguir explorando</button></div> : <>
           <div className="cart-items">{cart.map((item) => <article className="cart-item" key={item.id}>
-            {item.imageUrl ? <img src={item.imageUrl} alt="" /> : <div className="cart-placeholder">K</div>}
+            {item.imageUrl ? <img src={productImageSrc(item.imageUrl, item.updatedAt)} alt="" /> : <div className="cart-placeholder">K</div>}
             <div className="cart-item-info">
               <h3>{item.name}</h3>
               <PriceBlock price={item.price} priceBs={item.priceBs} />

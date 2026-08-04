@@ -1,4 +1,4 @@
-const CACHE = 'kronos-shell-v4'
+const CACHE = 'kronos-shell-v6'
 
 self.addEventListener('install', (event) => {
   self.skipWaiting()
